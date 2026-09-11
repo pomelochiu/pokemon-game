@@ -167,7 +167,8 @@
         .tone-side {
             position: absolute;
             right: -0.7em; 
-            top: 50%;
+            /* 將聲符從 50% 下調約 10% 變成 60% */
+            top: 60%;
             transform: translateY(-50%);
         }
 
@@ -248,6 +249,7 @@
             }
             .tone-side {
                 right: -0.5em; 
+                top: 60%; 
                 transform: translateY(-42%);
             }
             .tone-light {
@@ -300,6 +302,7 @@
         let isReadingMode = false;
         let isRecording = false; 
         let responseTimeout = null;
+        let autoStopTimeout = null;
         
         let pinyinFn = null;
         window.onload = () => {
@@ -335,13 +338,23 @@
 
             recognition.onstart = function() {
                 isRecording = true;
-                statusMessage.textContent = "👂 正在聽...(再按一次結束)";
-                micBtn.textContent = "⏹️ 結束錄音";
+                statusMessage.textContent = "👂 正在聽... (4秒後自動送出)";
+                micBtn.textContent = "⏹️ 錄音中...";
                 micBtn.style.backgroundColor = "#f44336"; 
+                
+                // 4秒後自動停止錄音並送出分析
+                autoStopTimeout = setTimeout(() => {
+                    if (isRecording) {
+                        recognition.stop(); 
+                        statusMessage.textContent = "⏳ 錄音結束，語音分析中...";
+                    }
+                }, 4000);
             };
 
             recognition.onspeechstart = function() {
-                statusMessage.textContent = "🎙️ 接收語音中...";
+                if (statusMessage.textContent.includes("正在聽")) {
+                    statusMessage.textContent = "🎙️ 接收語音中... (4秒後自動送出)";
+                }
             };
 
             recognition.onspeechend = function() {
@@ -350,6 +363,7 @@
 
             recognition.onresult = function(event) {
                 clearTimeout(responseTimeout); 
+                clearTimeout(autoStopTimeout);
                 const transcript = event.results[0][0].transcript;
                 checkAnswer(transcript);
                 resetMicButton();
@@ -357,12 +371,14 @@
 
             recognition.onnomatch = function() {
                 clearTimeout(responseTimeout);
+                clearTimeout(autoStopTimeout);
                 statusMessage.textContent = "🤔 系統無法辨識任何文字，請再試一次";
                 resetMicButton();
             };
 
             recognition.onerror = function(event) {
                 clearTimeout(responseTimeout);
+                clearTimeout(autoStopTimeout);
                 if (event.error !== 'aborted') {
                     statusMessage.textContent = `❌ 收音失敗 (${event.error})，請重試`;
                 }
@@ -371,6 +387,7 @@
 
             recognition.onend = function() {
                 clearTimeout(responseTimeout);
+                clearTimeout(autoStopTimeout);
                 if (isRecording) {
                     resetMicButton();
                     if (statusMessage.textContent.includes("正在聽") || statusMessage.textContent.includes("分析中")) {
@@ -451,32 +468,34 @@
         function checkAnswer(spokenText) {
             const cleanText = spokenText.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '');
             
-            // 輸出至開發者工具，方便除錯觀察
             console.log("語音辨識原始文字:", spokenText); 
             console.log("過濾後文字:", cleanText);
 
-            if (cleanText === currentPokemon.name) {
-                statusMessage.textContent = `🎉 答對了！是 ${currentPokemon.name}！`;
-                revealAnswer();
-                return;
-            }
-            
             if (pinyinFn) {
+                // 強制轉換為無音調羅馬拼音進行比對
                 const spokenPinyin = pinyinFn(cleanText, { toneType: 'none', type: 'string' }).replace(/\s/g, '').toLowerCase();
                 const targetPinyin = pinyinFn(currentPokemon.name, { toneType: 'none', type: 'string' }).replace(/\s/g, '').toLowerCase();
                 
-                // 觀察拼音轉換結果
-                console.log("辨識出的拼音:", spokenPinyin);
-                console.log("目標正確拼音:", targetPinyin);
+                console.log("辨識出的羅馬拼音:", spokenPinyin);
+                console.log("目標正確羅馬拼音:", targetPinyin);
 
                 if (spokenPinyin === targetPinyin) {
-                    statusMessage.textContent = `🎉 答對了！是 ${currentPokemon.name}！`;
+                    statusMessage.textContent = `🎉 答對了！(拼音相符: ${targetPinyin})`;
                     revealAnswer();
                     return;
+                } else {
+                    statusMessage.textContent = `🤔 聽到拼音「${spokenPinyin}」，不是「${targetPinyin}」`;
+                    return;
+                }
+            } else {
+                // 若 pinyin-pro 模組未載入的備用文字比對
+                if (cleanText === currentPokemon.name) {
+                    statusMessage.textContent = `🎉 答對了！是 ${currentPokemon.name}！`;
+                    revealAnswer();
+                } else {
+                    statusMessage.textContent = `🤔 聽到的是「${cleanText}」，再試一次！`;
                 }
             }
-
-            statusMessage.textContent = `🤔 聽到的是「${cleanText}」，再試一次！`;
         }
 
         modeBtn.addEventListener('click', () => {
@@ -487,25 +506,13 @@
 
         micBtn.addEventListener('click', () => {
             if (recognition) {
-                if (isRecording) {
-                    recognition.stop(); 
-                    statusMessage.textContent = "⏳ 等待伺服器回傳結果...";
-                    
-                    // 延長超時強制中斷機制為 8 秒
-                    responseTimeout = setTimeout(() => {
-                        if (isRecording) {
-                            recognition.abort(); 
-                            statusMessage.textContent = "⚠️ 系統無回應，已強制重置，請再試一次！";
-                            resetMicButton();
-                        }
-                    }, 8000);
-
-                } else {
-                    try {
-                        recognition.start(); 
-                    } catch (e) {
-                        console.error(e);
-                    }
+                // 如果已經在錄音中，不作任何處理，等待4秒自動結束
+                if (isRecording) return; 
+                
+                try {
+                    recognition.start(); 
+                } catch (e) {
+                    console.error(e);
                 }
             }
         });
