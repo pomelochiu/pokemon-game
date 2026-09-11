@@ -148,7 +148,7 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            margin-left: 4px; /* 電腦版拉近國字與注音 */
+            margin-left: 4px; 
             font-size: 28px;  
             color: #444;
             line-height: 1.1;
@@ -165,17 +165,16 @@
             align-items: center;
         }
 
-        /* 聲調緊貼注音符號 */
         .tone-side {
             position: absolute;
-            right: -0.3em; /* 大幅拉近二三四聲 */
+            right: -0.7em; 
             top: 50%;
             transform: translateY(-50%);
         }
 
         .tone-light {
             position: absolute;
-            top: -0.7em; /* 大幅拉近輕聲 */
+            top: -0.8em; 
             left: 50%;
             transform: translateX(-50%);
         }
@@ -186,6 +185,7 @@
             min-height: 40px;
             margin-bottom: 20px;
             font-weight: bold;
+            text-align: center;
         }
 
         .controls {
@@ -246,13 +246,15 @@
             }
             .zhuyin-col {
                 font-size: 18px; 
-                margin-left: 2px; /* 手機版極度拉近國字與注音 */
+                margin-left: 2px; 
             }
+            /* 調整聲調符號位置：往右及往下微調 */
             .tone-side {
-                right: -0.2em; /* 手機版極度拉近聲調 */
+                right: -0.5em; 
+                transform: translateY(-42%);
             }
             .tone-light {
-                top: -0.6em; 
+                top: -0.7em; 
             }
             #statusMessage {
                 font-size: 18px;
@@ -301,7 +303,6 @@
         let isReadingMode = false;
         let isRecording = false; 
         
-        // 安全載入 pinyinPro
         let pinyinFn = null;
         window.onload = () => {
             if (window.pinyinPro && window.pinyinPro.pinyin) {
@@ -336,23 +337,44 @@
 
             recognition.onstart = function() {
                 isRecording = true;
-                statusMessage.textContent = "👂 正在聽...(再按一次結束並送出)";
+                statusMessage.textContent = "👂 正在聽...(再按一次結束)";
                 micBtn.textContent = "⏹️ 結束錄音";
                 micBtn.style.backgroundColor = "#f44336"; 
+            };
+
+            // 新增詳細的語音處理狀態監聽
+            recognition.onspeechstart = function() {
+                statusMessage.textContent = "🎙️ 接收語音中...";
+            };
+
+            recognition.onspeechend = function() {
+                statusMessage.textContent = "⏳ 語音分析中，請稍候...";
             };
 
             recognition.onresult = function(event) {
                 const transcript = event.results[0][0].transcript;
                 checkAnswer(transcript);
+                resetMicButton();
+            };
+
+            recognition.onnomatch = function() {
+                statusMessage.textContent = "🤔 系統無法辨識任何文字，請再試一次";
+                resetMicButton();
             };
 
             recognition.onerror = function(event) {
-                statusMessage.textContent = "❌ 麥克風收音失敗，請再試一次";
+                statusMessage.textContent = `❌ 收音失敗 (${event.error})，請重試`;
                 resetMicButton();
             };
 
             recognition.onend = function() {
-                resetMicButton();
+                if (isRecording) {
+                    resetMicButton();
+                    // 防止覆蓋掉正確的錯誤或成功訊息
+                    if (statusMessage.textContent.includes("正在聽") || statusMessage.textContent.includes("分析中")) {
+                        statusMessage.textContent = "⏸️ 錄音已中斷，未收到辨識結果。";
+                    }
+                }
             };
         } else {
             statusMessage.textContent = "⚠️ 您的瀏覽器不支援語音辨識";
@@ -425,19 +447,15 @@
         }
 
         function checkAnswer(spokenText) {
-            // 移除可能出現的標點符號
             const cleanText = spokenText.replace(/[。，！？]/g, '');
             
-            // 1. 國字完全相同直接過關
             if (cleanText === currentPokemon.name) {
                 statusMessage.textContent = `🎉 答對了！是 ${currentPokemon.name}！`;
                 revealAnswer();
                 return;
             }
             
-            // 2. 羅馬拼音比對 (忽略聲調)，解決同音字判斷問題
             if (pinyinFn) {
-                // 將「使用者說的話」跟「正確答案」都在網頁端轉成拼音來比對
                 const spokenPinyin = pinyinFn(cleanText, { toneType: 'none', type: 'string' }).replace(/\s/g, '');
                 const targetPinyin = pinyinFn(currentPokemon.name, { toneType: 'none', type: 'string' }).replace(/\s/g, '');
                 
@@ -448,7 +466,6 @@
                 }
             }
 
-            // 3. 兩者皆不符，顯示錯誤提示
             statusMessage.textContent = `🤔 聽到的是「${cleanText}」，再試一次！`;
         }
 
@@ -462,8 +479,13 @@
             if (recognition) {
                 if (isRecording) {
                     recognition.stop(); 
+                    statusMessage.textContent = "⏳ 等待系統回傳結果...";
                 } else {
-                    recognition.start(); 
+                    try {
+                        recognition.start(); 
+                    } catch (e) {
+                        console.error(e);
+                    }
                 }
             }
         });
