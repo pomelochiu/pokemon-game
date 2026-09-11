@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>寶可夢拼音/認字挑戰</title>
-    <!-- 引入前端拼音轉換套件 pinyin-pro，用於羅馬拼音同音比對 -->
     <script src="https://unpkg.com/pinyin-pro"></script>
     <style>
         body {
@@ -186,7 +185,6 @@
             margin-bottom: 20px;
             font-weight: bold;
             text-align: center;
-            max-width: 90%;
         }
 
         .controls {
@@ -223,7 +221,6 @@
             box-shadow: none;
         }
 
-        /* --- 手機版響應式設計 --- */
         @media (max-width: 600px) {
             .header-bar {
                 justify-content: center;
@@ -249,13 +246,12 @@
                 font-size: 18px; 
                 margin-left: 2px; 
             }
-            /* 調整聲調符號位置：往右不變，再次往下微調 */
             .tone-side {
                 right: -0.5em; 
-                transform: translateY(-34%); 
+                transform: translateY(-42%);
             }
             .tone-light {
-                top: -0.5em; 
+                top: -0.7em; 
             }
             #statusMessage {
                 font-size: 18px;
@@ -303,7 +299,7 @@
         let currentPokemon = null;
         let isReadingMode = false;
         let isRecording = false; 
-        let recognitionTimeout = null; // 處理伺服器無回應的計時器
+        let responseTimeout = null; // 用來存放超時計時器
         
         let pinyinFn = null;
         window.onload = () => {
@@ -330,14 +326,6 @@
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recognition = null;
         
-        // 清除超時器
-        function clearRecTimer() {
-            if (recognitionTimeout) {
-                clearTimeout(recognitionTimeout);
-                recognitionTimeout = null;
-            }
-        }
-
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
             recognition.lang = 'zh-TW'; 
@@ -347,7 +335,6 @@
 
             recognition.onstart = function() {
                 isRecording = true;
-                clearRecTimer();
                 statusMessage.textContent = "👂 正在聽...(再按一次結束)";
                 micBtn.textContent = "⏹️ 結束錄音";
                 micBtn.style.backgroundColor = "#f44336"; 
@@ -362,35 +349,33 @@
             };
 
             recognition.onresult = function(event) {
-                clearRecTimer();
+                clearTimeout(responseTimeout); // 收到結果，取消超時倒數
                 const transcript = event.results[0][0].transcript;
                 checkAnswer(transcript);
                 resetMicButton();
             };
 
             recognition.onnomatch = function() {
-                clearRecTimer();
+                clearTimeout(responseTimeout);
                 statusMessage.textContent = "🤔 系統無法辨識任何文字，請再試一次";
                 resetMicButton();
             };
 
             recognition.onerror = function(event) {
-                clearRecTimer();
-                // 過濾掉沒講話就被終止的錯誤提示
-                if (event.error !== 'no-speech') {
+                clearTimeout(responseTimeout);
+                // 忽略強制中斷產生的 abort 錯誤提示，因為我們已經自訂了超時訊息
+                if (event.error !== 'aborted') {
                     statusMessage.textContent = `❌ 收音失敗 (${event.error})，請重試`;
-                } else {
-                    statusMessage.textContent = "🤔 沒有聽到聲音，請再試一次";
                 }
                 resetMicButton();
             };
 
             recognition.onend = function() {
-                clearRecTimer();
+                clearTimeout(responseTimeout);
                 if (isRecording) {
                     resetMicButton();
-                    if (statusMessage.textContent.includes("正在聽") || statusMessage.textContent.includes("分析中") || statusMessage.textContent.includes("等待")) {
-                        statusMessage.textContent = "⏸️ 系統無回應，請再試一次。";
+                    if (statusMessage.textContent.includes("正在聽") || statusMessage.textContent.includes("分析中")) {
+                        statusMessage.textContent = "⏸️ 錄音已結束，未收到辨識結果。";
                     }
                 }
             };
@@ -497,15 +482,17 @@
             if (recognition) {
                 if (isRecording) {
                     recognition.stop(); 
-                    statusMessage.textContent = "⏳ 等待系統回傳結果...";
-                    // 設定超時強制中斷，避免伺服器無回應卡死
-                    recognitionTimeout = setTimeout(() => {
+                    statusMessage.textContent = "⏳ 等待伺服器回傳結果...";
+                    
+                    // 啟動 4 秒超時強制中斷機制
+                    responseTimeout = setTimeout(() => {
                         if (isRecording) {
-                            recognition.abort();
+                            recognition.abort(); // 強制切斷 API 連線
+                            statusMessage.textContent = "⚠️ 系統無回應，已強制重置，請再試一次！";
                             resetMicButton();
-                            statusMessage.textContent = "🤔 系統沒有聽到聲音或連線超時，請大聲點再試一次！";
                         }
-                    }, 3500);
+                    }, 4000);
+
                 } else {
                     try {
                         recognition.start(); 
