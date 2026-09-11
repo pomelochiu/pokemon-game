@@ -299,7 +299,7 @@
         let currentPokemon = null;
         let isReadingMode = false;
         let isRecording = false; 
-        let responseTimeout = null; // 用來存放超時計時器
+        let responseTimeout = null;
         
         let pinyinFn = null;
         window.onload = () => {
@@ -349,7 +349,7 @@
             };
 
             recognition.onresult = function(event) {
-                clearTimeout(responseTimeout); // 收到結果，取消超時倒數
+                clearTimeout(responseTimeout); 
                 const transcript = event.results[0][0].transcript;
                 checkAnswer(transcript);
                 resetMicButton();
@@ -363,7 +363,6 @@
 
             recognition.onerror = function(event) {
                 clearTimeout(responseTimeout);
-                // 忽略強制中斷產生的 abort 錯誤提示，因為我們已經自訂了超時訊息
                 if (event.error !== 'aborted') {
                     statusMessage.textContent = `❌ 收音失敗 (${event.error})，請重試`;
                 }
@@ -450,7 +449,8 @@
         }
 
         function checkAnswer(spokenText) {
-            const cleanText = spokenText.replace(/[。，！？]/g, '');
+            // 過濾所有非中文字與英數字，排除空白或未預期符號的干擾
+            const cleanText = spokenText.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '');
             
             if (cleanText === currentPokemon.name) {
                 statusMessage.textContent = `🎉 答對了！是 ${currentPokemon.name}！`;
@@ -459,8 +459,9 @@
             }
             
             if (pinyinFn) {
-                const spokenPinyin = pinyinFn(cleanText, { toneType: 'none', type: 'string' }).replace(/\s/g, '');
-                const targetPinyin = pinyinFn(currentPokemon.name, { toneType: 'none', type: 'string' }).replace(/\s/g, '');
+                // 將辨識字串與目標字串皆轉為無音調羅馬拼音，並統一轉換為小寫進行嚴格比對
+                const spokenPinyin = pinyinFn(cleanText, { toneType: 'none', type: 'string' }).replace(/\s/g, '').toLowerCase();
+                const targetPinyin = pinyinFn(currentPokemon.name, { toneType: 'none', type: 'string' }).replace(/\s/g, '').toLowerCase();
                 
                 if (spokenPinyin === targetPinyin) {
                     statusMessage.textContent = `🎉 答對了！是 ${currentPokemon.name}！`;
@@ -484,10 +485,9 @@
                     recognition.stop(); 
                     statusMessage.textContent = "⏳ 等待伺服器回傳結果...";
                     
-                    // 啟動 4 秒超時強制中斷機制
                     responseTimeout = setTimeout(() => {
                         if (isRecording) {
-                            recognition.abort(); // 強制切斷 API 連線
+                            recognition.abort(); 
                             statusMessage.textContent = "⚠️ 系統無回應，已強制重置，請再試一次！";
                             resetMicButton();
                         }
