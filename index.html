@@ -449,9 +449,12 @@
         }
 
         function checkAnswer(spokenText) {
-            // 過濾所有非中文字與英數字，排除空白或未預期符號的干擾
             const cleanText = spokenText.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '');
             
+            // 輸出至開發者工具，方便除錯觀察
+            console.log("語音辨識原始文字:", spokenText); 
+            console.log("過濾後文字:", cleanText);
+
             if (cleanText === currentPokemon.name) {
                 statusMessage.textContent = `🎉 答對了！是 ${currentPokemon.name}！`;
                 revealAnswer();
@@ -459,10 +462,13 @@
             }
             
             if (pinyinFn) {
-                // 將辨識字串與目標字串皆轉為無音調羅馬拼音，並統一轉換為小寫進行嚴格比對
                 const spokenPinyin = pinyinFn(cleanText, { toneType: 'none', type: 'string' }).replace(/\s/g, '').toLowerCase();
                 const targetPinyin = pinyinFn(currentPokemon.name, { toneType: 'none', type: 'string' }).replace(/\s/g, '').toLowerCase();
                 
+                // 觀察拼音轉換結果
+                console.log("辨識出的拼音:", spokenPinyin);
+                console.log("目標正確拼音:", targetPinyin);
+
                 if (spokenPinyin === targetPinyin) {
                     statusMessage.textContent = `🎉 答對了！是 ${currentPokemon.name}！`;
                     revealAnswer();
@@ -485,13 +491,14 @@
                     recognition.stop(); 
                     statusMessage.textContent = "⏳ 等待伺服器回傳結果...";
                     
+                    // 延長超時強制中斷機制為 8 秒
                     responseTimeout = setTimeout(() => {
                         if (isRecording) {
                             recognition.abort(); 
                             statusMessage.textContent = "⚠️ 系統無回應，已強制重置，請再試一次！";
                             resetMicButton();
                         }
-                    }, 4000);
+                    }, 8000);
 
                 } else {
                     try {
