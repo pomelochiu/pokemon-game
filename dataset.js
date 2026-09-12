@@ -1116,7 +1116,7 @@ const pokemonDB = [
         "name": "電擊獸",
         "zhuyin": [
             "ㄉㄧㄢˋ",
-            "ㄐㄧ",
+            "ㄐㄧˊ",
             "ㄕㄡˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/125.png"
@@ -2151,7 +2151,7 @@ const pokemonDB = [
         "name": "電擊怪",
         "zhuyin": [
             "ㄉㄧㄢˋ",
-            "ㄐㄧ",
+            "ㄐㄧˊ",
             "ㄍㄨㄞˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/239.png"
@@ -4258,7 +4258,7 @@ const pokemonDB = [
         "name": "電擊魔獸",
         "zhuyin": [
             "ㄉㄧㄢˋ",
-            "ㄐㄧ",
+            "ㄐㄧˊ",
             "ㄇㄛˊ",
             "ㄕㄡˋ"
         ],
@@ -4944,7 +4944,7 @@ const pokemonDB = [
         "name": "打擊鬼",
         "zhuyin": [
             "ㄉㄚˇ",
-            "ㄐㄧ",
+            "ㄐㄧˊ",
             "ㄍㄨㄟˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/539.png"
