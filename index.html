@@ -2,44 +2,71 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>寶可夢拼音/認字挑戰</title>
     <script src="https://unpkg.com/pinyin-pro"></script>
+
     <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html {
+            min-height: 100%;
+        }
+
         body {
             font-family: "Microsoft JhengHei", "PingFang TC", Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
+            min-height: 100vh;
+            min-height: 100dvh;
             background-color: #f5f5f5;
             margin: 0;
-            padding: 20px;
+            padding: max(18px, env(safe-area-inset-top))
+                     max(18px, env(safe-area-inset-right))
+                     max(22px, env(safe-area-inset-bottom))
+                     max(18px, env(safe-area-inset-left));
+            overscroll-behavior: none;
+        }
+
+        .game-shell {
+            width: min(100%, 760px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .header-bar {
             width: 100%;
-            max-width: 600px;
             display: flex;
             justify-content: flex-end;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         #modeBtn {
-            font-size: 18px;
-            padding: 8px 16px;
+            font-size: clamp(17px, 2vw, 21px);
+            padding: 10px 18px;
+            min-height: 48px;
             background-color: #9c27b0;
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            font-weight: bold;
+            touch-action: manipulation;
         }
 
         .card-container {
             perspective: 1000px;
-            width: 280px;
-            height: 400px;
-            margin-bottom: 30px;
+            width: clamp(250px, 33vw, 340px);
+            aspect-ratio: 7 / 10;
+            margin-bottom: 26px;
         }
 
         .card {
@@ -58,28 +85,34 @@
             width: 100%;
             height: 100%;
             position: absolute;
+            inset: 0;
             backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 15px;
+            border-radius: 18px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             background-color: white;
             border: 6px solid #ffcc00;
+            overflow: hidden;
         }
 
         .card-back {
             background: radial-gradient(circle, #2b67ad 0%, #102d57 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
         .pokeball {
-            width: 120px;
-            height: 120px;
+            width: clamp(105px, 14vw, 145px);
+            height: clamp(105px, 14vw, 145px);
             border-radius: 50%;
-            background: linear-gradient(to bottom, #d22630 46%, #000000 46%, #000000 54%, #ffffff 54%);
+            background: linear-gradient(
+                to bottom,
+                #d22630 46%,
+                #000000 46%,
+                #000000 54%,
+                #ffffff 54%
+            );
             border: 6px solid #000000;
             position: relative;
             box-shadow: 0 4px 15px rgba(0,0,0,0.4);
@@ -116,18 +149,26 @@
         }
 
         .card-front img {
-            max-width: 90%;
-            max-height: 90%;
+            width: 112%;
+            height: 112%;
+            max-width: none;
+            max-height: none;
             object-fit: contain;
+            display: block;
+            user-select: none;
+            -webkit-user-drag: none;
         }
 
         .bopomofo-display {
+            width: 100%;
             display: flex;
             flex-direction: row;
             justify-content: center;
-            gap: 25px; 
-            margin-bottom: 20px;
-            min-height: 120px;
+            align-items: center;
+            gap: clamp(12px, 3vw, 26px);
+            margin-bottom: 16px;
+            min-height: 116px;
+            flex-wrap: wrap;
         }
 
         .char-block {
@@ -137,9 +178,10 @@
         }
 
         .char-text {
-            font-size: 64px;
+            font-size: clamp(43px, 6vw, 68px);
             font-weight: bold;
             color: #222;
+            line-height: 1.1;
         }
 
         .zhuyin-col {
@@ -147,11 +189,11 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            margin-left: 4px; 
-            font-size: 28px;  
+            margin-left: 4px;
+            font-size: clamp(20px, 2.7vw, 29px);
             color: #444;
             line-height: 1.1;
-            font-weight: bold; 
+            font-weight: bold;
         }
 
         .hide-zhuyin .zhuyin-col {
@@ -166,38 +208,57 @@
 
         .tone-side {
             position: absolute;
-            right: -0.7em; 
-            /* 將聲符從 50% 下調約 10% 變成 60% */
+            right: -0.7em;
             top: 60%;
             transform: translateY(-50%);
         }
 
         .tone-light {
             position: absolute;
-            top: -0.8em; 
+            top: -0.8em;
             left: 50%;
             transform: translateX(-50%);
         }
 
         #statusMessage {
-            font-size: 24px;
+            width: 100%;
+            font-size: clamp(20px, 2.8vw, 26px);
             color: #555;
-            min-height: 40px;
-            margin-bottom: 20px;
+            min-height: 46px;
+            margin-bottom: 18px;
             font-weight: bold;
             text-align: center;
+            line-height: 1.4;
+        }
+
+        #statusMessage.success {
+            color: #2e7d32;
+        }
+
+        #statusMessage.close {
+            color: #ef6c00;
+        }
+
+        #statusMessage.retry {
+            color: #555;
+        }
+
+        #statusMessage.error {
+            color: #c62828;
         }
 
         .controls {
+            width: 100%;
             display: flex;
-            gap: 15px;
+            gap: 14px;
             flex-wrap: wrap;
             justify-content: center;
         }
 
         button.action-btn {
-            font-size: 28px;
-            padding: 15px 40px;
+            font-size: clamp(21px, 3vw, 28px);
+            padding: 14px 30px;
+            min-height: 60px;
             border: none;
             border-radius: 12px;
             cursor: pointer;
@@ -205,10 +266,17 @@
             color: white;
             font-weight: bold;
             box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+            touch-action: manipulation;
+            white-space: nowrap;
         }
 
         button.action-btn:active {
-            transform: scale(0.95);
+            transform: scale(0.97);
+        }
+
+        button.action-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
         }
 
         button.action-btn.secondary {
@@ -222,309 +290,2009 @@
             box-shadow: none;
         }
 
+        /* iPad / 平板 */
+        @media (min-width: 601px) and (max-width: 1180px) {
+            body {
+                padding-top: max(22px, env(safe-area-inset-top));
+            }
+
+            .game-shell {
+                width: min(92vw, 820px);
+            }
+
+            .header-bar {
+                margin-bottom: 16px;
+            }
+
+            .card-container {
+                width: clamp(300px, 39vw, 390px);
+                margin-bottom: 24px;
+            }
+
+            .card-front img {
+                width: 116%;
+                height: 116%;
+            }
+
+            .bopomofo-display {
+                min-height: 126px;
+            }
+
+            button.action-btn {
+                min-width: 180px;
+                padding-left: 28px;
+                padding-right: 28px;
+            }
+        }
+
+        /* iPad 橫向 */
+        @media (min-width: 768px)
+               and (max-height: 850px)
+               and (orientation: landscape) {
+
+            .header-bar {
+                margin-bottom: 8px;
+            }
+
+            .card-container {
+                width: min(29vw, 290px);
+                margin-bottom: 12px;
+            }
+
+            .bopomofo-display {
+                min-height: 82px;
+                margin-bottom: 8px;
+            }
+
+            .char-text {
+                font-size: clamp(40px, 5vw, 56px);
+            }
+
+            #statusMessage {
+                margin-bottom: 10px;
+                min-height: 38px;
+            }
+
+            button.action-btn {
+                min-height: 52px;
+                padding-top: 10px;
+                padding-bottom: 10px;
+            }
+        }
+
+        /* 手機 */
         @media (max-width: 600px) {
+            body {
+                padding: max(14px, env(safe-area-inset-top))
+                         max(12px, env(safe-area-inset-right))
+                         max(18px, env(safe-area-inset-bottom))
+                         max(12px, env(safe-area-inset-left));
+            }
+
             .header-bar {
                 justify-content: center;
+                margin-bottom: 14px;
             }
+
             .card-container {
-                width: 220px;
-                height: 314px;
-                margin-bottom: 20px;
+                width: min(66vw, 240px);
+                margin-bottom: 16px;
             }
+
+            .card-face {
+                border-width: 5px;
+            }
+
+            .card-front img {
+                width: 116%;
+                height: 116%;
+            }
+
             .pokeball {
                 width: 90px;
                 height: 90px;
             }
+
             .bopomofo-display {
                 gap: 10px;
-                flex-wrap: wrap;
-                min-height: 90px;
+                min-height: 88px;
+                margin-bottom: 12px;
             }
+
             .char-text {
                 font-size: 40px;
             }
+
             .zhuyin-col {
-                font-size: 18px; 
-                margin-left: 2px; 
+                font-size: 18px;
+                margin-left: 2px;
             }
+
             .tone-side {
-                right: -0.5em; 
-                top: 60%; 
+                right: -0.5em;
+                top: 60%;
                 transform: translateY(-42%);
             }
+
             .tone-light {
-                top: -0.7em; 
+                top: -0.7em;
             }
+
             #statusMessage {
                 font-size: 18px;
+                min-height: 40px;
+                margin-bottom: 14px;
             }
+
             button.action-btn {
                 font-size: 20px;
-                padding: 12px 24px;
+                padding: 12px 20px;
+                min-height: 52px;
             }
+
             .controls {
-                gap: 10px;
+                gap: 9px;
             }
         }
     </style>
 </head>
+
 <body>
 
-    <div class="header-bar">
-        <button id="modeBtn">切換為：認字模式</button>
-    </div>
+    <main class="game-shell">
 
-    <div class="card-container">
-        <div class="card" id="pokemonCard">
-            <div class="card-face card-back">
-                <div class="pokeball"></div>
-            </div>
-            <div class="card-face card-front">
-                <img id="pokemonImage" src="" alt="Pokemon">
+        <div class="header-bar">
+            <button id="modeBtn" type="button">
+                切換為：認字模式
+            </button>
+        </div>
+
+        <div class="card-container">
+            <div class="card" id="pokemonCard">
+
+                <div class="card-face card-back">
+                    <div class="pokeball"></div>
+                </div>
+
+                <div class="card-face card-front">
+                    <img id="pokemonImage" src="" alt="Pokemon">
+                </div>
+
             </div>
         </div>
-    </div>
 
-    <div class="bopomofo-display" id="bopomofoText"></div>
+        <div
+            class="bopomofo-display"
+            id="bopomofoText">
+        </div>
 
-    <div id="statusMessage">準備好了嗎？</div>
+        <div id="statusMessage">
+            準備好了嗎？
+        </div>
 
-    <div class="controls">
-        <button id="micBtn" class="action-btn">🎤 按下說話</button>
-        <button id="showBtn" class="action-btn outline">看答案</button>
-        <button id="nextBtn" class="action-btn secondary">下一題</button>
-    </div>
+        <div class="controls">
+
+            <button
+                id="micBtn"
+                class="action-btn"
+                type="button">
+                🎤 按下說話
+            </button>
+
+            <button
+                id="showBtn"
+                class="action-btn outline"
+                type="button">
+                看答案
+            </button>
+
+            <button
+                id="nextBtn"
+                class="action-btn secondary"
+                type="button">
+                下一題
+            </button>
+
+        </div>
+
+    </main>
+
 
     <script src="dataset.js"></script>
-    
+
+
     <script>
+
         let currentPokemon = null;
         let isReadingMode = false;
-        let isRecording = false; 
-        let responseTimeout = null;
+        let isRecording = false;
+
         let autoStopTimeout = null;
-        
+
+
+        /*
+         * 第一版的測試門檻
+         *
+         * 90～100：
+         * 判定答對，自動翻牌
+         *
+         * 75～89：
+         * 差一點點
+         *
+         * 0～74：
+         * 再試一次
+         *
+         * 之後可以依照實際使用結果再調整。
+         */
+        const SCORE_CORRECT = 90;
+        const SCORE_CLOSE = 75;
+
+
+        /*
+         * 保留原本的四秒錄音上限。
+         *
+         * 主要是為了 Safari / iPad：
+         * 避免 SpeechRecognition 沒有正常結束，
+         * 導致麥克風長時間保持開啟。
+         */
+        const RECORDING_LIMIT_MS = 4000;
+
+
         let pinyinFn = null;
-        window.onload = () => {
-            if (window.pinyinPro && window.pinyinPro.pinyin) {
-                pinyinFn = window.pinyinPro.pinyin;
-            }
-            
-            if (typeof pokemonDB !== 'undefined' && pokemonDB.length > 0) {
-                loadRandomPokemon();
+
+
+        const card =
+            document.getElementById('pokemonCard');
+
+        const pokemonImage =
+            document.getElementById('pokemonImage');
+
+        const bopomofoText =
+            document.getElementById('bopomofoText');
+
+        const statusMessage =
+            document.getElementById('statusMessage');
+
+        const micBtn =
+            document.getElementById('micBtn');
+
+        const showBtn =
+            document.getElementById('showBtn');
+
+        const nextBtn =
+            document.getElementById('nextBtn');
+
+        const modeBtn =
+            document.getElementById('modeBtn');
+
+
+        /*
+         * 統一處理提示文字
+         */
+        function setStatus(message, type = '') {
+
+            statusMessage.textContent = message;
+            statusMessage.className = type;
+
+        }
+
+
+        /*
+         * 頁面載入完成
+         */
+        window.addEventListener('load', () => {
+
+            if (
+                window.pinyinPro &&
+                window.pinyinPro.pinyin
+            ) {
+
+                pinyinFn =
+                    window.pinyinPro.pinyin;
+
             } else {
-                statusMessage.textContent = "⏳ 找不到題庫，請確認 dataset.js 是否正確載入。";
+
+                console.warn(
+                    'pinyin-pro 載入失敗，將使用中文字備用比對。'
+                );
+
             }
-        };
 
-        const card = document.getElementById('pokemonCard');
-        const pokemonImage = document.getElementById('pokemonImage');
-        const bopomofoText = document.getElementById('bopomofoText');
-        const statusMessage = document.getElementById('statusMessage');
-        const micBtn = document.getElementById('micBtn');
-        const showBtn = document.getElementById('showBtn');
-        const nextBtn = document.getElementById('nextBtn');
-        const modeBtn = document.getElementById('modeBtn');
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (
+                typeof pokemonDB !== 'undefined' &&
+                pokemonDB.length > 0
+            ) {
+
+                loadRandomPokemon();
+
+            } else {
+
+                setStatus(
+                    '⏳ 找不到題庫，請確認 dataset.js 是否正確載入。',
+                    'error'
+                );
+
+            }
+
+        });
+
+
+        /*
+         * Web Speech Recognition
+         */
+        const SpeechRecognition =
+            window.SpeechRecognition ||
+            window.webkitSpeechRecognition;
+
         let recognition = null;
-        
+
+
         if (SpeechRecognition) {
-            recognition = new SpeechRecognition();
-            recognition.lang = 'zh-TW'; 
-            recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
-            recognition.continuous = false; 
 
-            recognition.onstart = function() {
-                isRecording = true;
-                statusMessage.textContent = "👂 正在聽... (4秒後自動送出)";
-                micBtn.textContent = "⏹️ 錄音中...";
-                micBtn.style.backgroundColor = "#f44336"; 
-                
-                // 4秒後自動停止錄音並送出分析
-                autoStopTimeout = setTimeout(() => {
+            recognition =
+                new SpeechRecognition();
+
+
+            recognition.lang =
+                'zh-TW';
+
+            recognition.interimResults =
+                false;
+
+            /*
+             * 第一版仍維持單一辨識結果。
+             *
+             * 多候選結果留到第二階段，
+             * 等第一版實際測試完再決定。
+             */
+            recognition.maxAlternatives =
+                1;
+
+            recognition.continuous =
+                false;
+
+
+            /*
+             * 開始錄音
+             */
+            recognition.onstart =
+                function () {
+
+                    isRecording = true;
+
+
+                    setStatus(
+                        '👂 正在聽... 請開始說話'
+                    );
+
+
+                    micBtn.textContent =
+                        '⏹️ 錄音中...';
+
+                    micBtn.style.backgroundColor =
+                        '#f44336';
+
+                    micBtn.setAttribute(
+                        'aria-pressed',
+                        'true'
+                    );
+
+
+                    clearTimeout(
+                        autoStopTimeout
+                    );
+
+
+                    /*
+                     * 四秒後強制停止。
+                     *
+                     * 保留原本解決 Safari
+                     * 麥克風無法正常關閉的設計。
+                     */
+                    autoStopTimeout =
+                        setTimeout(() => {
+
+                            if (
+                                isRecording &&
+                                recognition
+                            ) {
+
+                                try {
+
+                                    setStatus(
+                                        '⏳ 錄音結束，語音分析中...'
+                                    );
+
+
+                                    recognition.stop();
+
+                                } catch (error) {
+
+                                    console.warn(
+                                        'recognition.stop() 發生錯誤：',
+                                        error
+                                    );
+
+
+                                    forceResetRecognitionUI();
+
+                                }
+
+                            }
+
+                        }, RECORDING_LIMIT_MS);
+
+                };
+
+
+            /*
+             * 確認開始收到語音
+             */
+            recognition.onspeechstart =
+                function () {
+
                     if (isRecording) {
-                        recognition.stop(); 
-                        statusMessage.textContent = "⏳ 錄音結束，語音分析中...";
+
+                        setStatus(
+                            '🎙️ 收到聲音了，請把答案說完'
+                        );
+
                     }
-                }, 4000);
-            };
 
-            recognition.onspeechstart = function() {
-                if (statusMessage.textContent.includes("正在聽")) {
-                    statusMessage.textContent = "🎙️ 接收語音中... (4秒後自動送出)";
-                }
-            };
+                };
 
-            recognition.onspeechend = function() {
-                statusMessage.textContent = "⏳ 語音分析中，請稍候...";
-            };
 
-            recognition.onresult = function(event) {
-                clearTimeout(responseTimeout); 
-                clearTimeout(autoStopTimeout);
-                const transcript = event.results[0][0].transcript;
-                checkAnswer(transcript);
-                resetMicButton();
-            };
+            /*
+             * 使用者停止說話
+             */
+            recognition.onspeechend =
+                function () {
 
-            recognition.onnomatch = function() {
-                clearTimeout(responseTimeout);
-                clearTimeout(autoStopTimeout);
-                statusMessage.textContent = "🤔 系統無法辨識任何文字，請再試一次";
-                resetMicButton();
-            };
+                    if (isRecording) {
 
-            recognition.onerror = function(event) {
-                clearTimeout(responseTimeout);
-                clearTimeout(autoStopTimeout);
-                if (event.error !== 'aborted') {
-                    statusMessage.textContent = `❌ 收音失敗 (${event.error})，請重試`;
-                }
-                resetMicButton();
-            };
+                        setStatus(
+                            '⏳ 語音分析中，請稍候...'
+                        );
 
-            recognition.onend = function() {
-                clearTimeout(responseTimeout);
-                clearTimeout(autoStopTimeout);
-                if (isRecording) {
+                    }
+
+                };
+
+
+            /*
+             * 收到辨識結果
+             */
+            recognition.onresult =
+                function (event) {
+
+                    clearTimeout(
+                        autoStopTimeout
+                    );
+
+
+                    const result =
+                        event.results &&
+                        event.results[0] &&
+                        event.results[0][0];
+
+
+                    const transcript =
+                        result
+                            ? result.transcript
+                            : '';
+
+
+                    const confidence =
+                        result &&
+                        typeof result.confidence === 'number'
+
+                            ? result.confidence
+                            : null;
+
+
+                    /*
+                     * 這些資訊只顯示在 Console，
+                     * 不會讓小朋友看到。
+                     */
+                    console.log(
+                        '語音辨識原始文字:',
+                        transcript
+                    );
+
+
+                    if (confidence !== null) {
+
+                        console.log(
+                            '語音辨識 confidence:',
+                            confidence
+                        );
+
+                    }
+
+
+                    if (transcript.trim()) {
+
+                        checkAnswer(
+                            transcript
+                        );
+
+                    } else {
+
+                        setStatus(
+                            '🤔 沒有聽清楚，再試一次唷！',
+                            'retry'
+                        );
+
+                    }
+
+
                     resetMicButton();
-                    if (statusMessage.textContent.includes("正在聽") || statusMessage.textContent.includes("分析中")) {
-                        statusMessage.textContent = "⏸️ 錄音已結束，未收到辨識結果。";
+
+                };
+
+
+            /*
+             * 完全沒有匹配結果
+             */
+            recognition.onnomatch =
+                function () {
+
+                    clearTimeout(
+                        autoStopTimeout
+                    );
+
+
+                    setStatus(
+                        '🤔 沒有聽清楚，再試一次唷！',
+                        'retry'
+                    );
+
+
+                    resetMicButton();
+
+                };
+
+
+            /*
+             * 語音辨識錯誤
+             */
+            recognition.onerror =
+                function (event) {
+
+                    clearTimeout(
+                        autoStopTimeout
+                    );
+
+
+                    /*
+                     * Safari 在 stop / abort
+                     * 時偶爾可能回傳 aborted，
+                     * 不需要把它顯示成嚴重錯誤。
+                     */
+                    if (
+                        event.error === 'aborted'
+                    ) {
+
+                        console.log(
+                            '語音辨識已中止（aborted）'
+                        );
+
                     }
-                }
-            };
-        } else {
-            statusMessage.textContent = "⚠️ 您的瀏覽器不支援語音辨識";
+
+                    else if (
+                        event.error === 'no-speech'
+                    ) {
+
+                        setStatus(
+                            '👂 好像沒有聽到聲音，再試一次唷！',
+                            'retry'
+                        );
+
+                    }
+
+                    else if (
+                        event.error === 'not-allowed' ||
+                        event.error === 'service-not-allowed'
+                    ) {
+
+                        setStatus(
+                            '🎤 請允許瀏覽器使用麥克風後再試一次。',
+                            'error'
+                        );
+
+                    }
+
+                    else {
+
+                        setStatus(
+                            '❌ 收音沒有成功，請再試一次。',
+                            'error'
+                        );
+
+                    }
+
+
+                    console.warn(
+                        'SpeechRecognition error:',
+                        event.error
+                    );
+
+
+                    resetMicButton();
+
+                };
+
+
+            /*
+             * SpeechRecognition 正式結束
+             */
+            recognition.onend =
+                function () {
+
+                    clearTimeout(
+                        autoStopTimeout
+                    );
+
+
+                    /*
+                     * 如果 Safari 只回傳 onend，
+                     * 沒有正常收到結果，
+                     * 仍然一定把按鈕恢復。
+                     */
+                    if (isRecording) {
+
+                        const wasWaitingForResult =
+
+                            statusMessage.textContent
+                                .includes('分析中')
+
+                            ||
+
+                            statusMessage.textContent
+                                .includes('正在聽')
+
+                            ||
+
+                            statusMessage.textContent
+                                .includes('收到聲音');
+
+
+                        resetMicButton();
+
+
+                        if (wasWaitingForResult) {
+
+                            setStatus(
+                                '⏸️ 沒有收到辨識結果，再試一次唷！',
+                                'retry'
+                            );
+
+                        }
+
+                    }
+
+                };
+
+        }
+
+        else {
+
+            setStatus(
+                '⚠️ 目前瀏覽器不支援語音辨識，請改用支援的瀏覽器。',
+                'error'
+            );
+
+
             micBtn.disabled = true;
+
         }
 
+
+        /*
+         * 麥克風按鈕恢復正常
+         */
         function resetMicButton() {
+
             isRecording = false;
-            micBtn.textContent = "🎤 按下說話";
-            micBtn.style.backgroundColor = "#4CAF50";
+
+
+            clearTimeout(
+                autoStopTimeout
+            );
+
+
+            micBtn.textContent =
+                '🎤 按下說話';
+
+
+            micBtn.style.backgroundColor =
+                '#4CAF50';
+
+
+            micBtn.setAttribute(
+                'aria-pressed',
+                'false'
+            );
+
         }
 
-        function generateZhuyinHTML(name, zhuyinArray) {
+
+        /*
+         * 強制恢復 UI
+         */
+        function forceResetRecognitionUI() {
+
+            clearTimeout(
+                autoStopTimeout
+            );
+
+
+            resetMicButton();
+
+
+            setStatus(
+                '⏸️ 錄音已結束，請再試一次唷！',
+                'retry'
+            );
+
+        }
+
+
+        /*
+         * 產生國字與直式注音
+         */
+        function generateZhuyinHTML(
+            name,
+            zhuyinArray
+        ) {
+
             let html = '';
-            for (let i = 0; i < name.length; i++) {
-                let char = name[i];
-                let bpmf = zhuyinArray[i] || ""; 
+
+
+            for (
+                let i = 0;
+                i < name.length;
+                i++
+            ) {
+
+                const char =
+                    name[i];
+
+
+                const bpmf =
+                    zhuyinArray[i] || '';
+
+
                 let tone = '';
                 let lightTone = '';
-                let mainBpmf = bpmf;
 
-                if (bpmf.startsWith('˙')) {
-                    lightTone = '˙';
-                    mainBpmf = bpmf.substring(1);
-                } else if (['ˊ', 'ˇ', 'ˋ'].includes(bpmf.slice(-1))) {
-                    tone = bpmf.slice(-1);
-                    mainBpmf = bpmf.slice(0, -1);
+                let mainBpmf =
+                    bpmf;
+
+
+                /*
+                 * 輕聲
+                 */
+                if (
+                    bpmf.startsWith('˙')
+                ) {
+
+                    lightTone =
+                        '˙';
+
+
+                    mainBpmf =
+                        bpmf.substring(1);
+
                 }
 
-                let bpmfSpans = mainBpmf.split('').map(b => `<span>${b}</span>`).join('');
+                /*
+                 * 二、三、四聲
+                 */
+                else if (
+                    ['ˊ', 'ˇ', 'ˋ']
+                        .includes(
+                            bpmf.slice(-1)
+                        )
+                ) {
+
+                    tone =
+                        bpmf.slice(-1);
+
+
+                    mainBpmf =
+                        bpmf.slice(
+                            0,
+                            -1
+                        );
+
+                }
+
+
+                const bpmfSpans =
+                    mainBpmf
+
+                        .split('')
+
+                        .map(
+                            b =>
+                                `<span>${b}</span>`
+                        )
+
+                        .join('');
+
 
                 html += `
+
                     <div class="char-block">
-                        <div class="char-text">${char}</div>
-                        <div class="zhuyin-col">
-                            ${lightTone ? `<div class="tone-light">${lightTone}</div>` : ''}
-                            <div class="bpmf-stack">${bpmfSpans}</div>
-                            ${tone ? `<div class="tone-side">${tone}</div>` : ''}
+
+                        <div class="char-text">
+                            ${char}
                         </div>
+
+                        <div class="zhuyin-col">
+
+                            ${
+                                lightTone
+
+                                    ? `<div class="tone-light">${lightTone}</div>`
+
+                                    : ''
+                            }
+
+                            <div class="bpmf-stack">
+                                ${bpmfSpans}
+                            </div>
+
+                            ${
+                                tone
+
+                                    ? `<div class="tone-side">${tone}</div>`
+
+                                    : ''
+                            }
+
+                        </div>
+
                     </div>
+
                 `;
+
             }
+
+
             return html;
+
         }
 
+
+        /*
+         * 載入隨機寶可夢
+         */
         function loadRandomPokemon() {
-            card.classList.remove('flipped');
-            
-            if (isReadingMode) {
-                bopomofoText.classList.add('hide-zhuyin');
-                statusMessage.textContent = "請唸出上面的國字";
-            } else {
-                bopomofoText.classList.remove('hide-zhuyin');
-                statusMessage.textContent = "請拼出上面的注音";
+
+            if (
+                typeof pokemonDB === 'undefined' ||
+                pokemonDB.length === 0
+            ) {
+
+                return;
+
             }
-            
-            const randomIndex = Math.floor(Math.random() * pokemonDB.length);
-            currentPokemon = pokemonDB[randomIndex];
 
-            bopomofoText.innerHTML = generateZhuyinHTML(currentPokemon.name, currentPokemon.zhuyin);
-            
-            setTimeout(() => {
-                pokemonImage.src = currentPokemon.image;
-            }, 300);
-        }
 
-        function revealAnswer() {
-            card.classList.add('flipped');
-            bopomofoText.classList.remove('hide-zhuyin'); 
-        }
+            /*
+             * 如果換題時還在錄音，
+             * 主動終止辨識。
+             *
+             * 主要避免 iPad / Safari
+             * 麥克風狀態殘留。
+             */
+            if (
+                isRecording &&
+                recognition
+            ) {
 
-        function checkAnswer(spokenText) {
-            const cleanText = spokenText.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '');
-            
-            console.log("語音辨識原始文字:", spokenText); 
-            console.log("過濾後文字:", cleanText);
-
-            if (pinyinFn) {
-                // 強制轉換為無音調羅馬拼音進行比對
-                const spokenPinyin = pinyinFn(cleanText, { toneType: 'none', type: 'string' }).replace(/\s/g, '').toLowerCase();
-                const targetPinyin = pinyinFn(currentPokemon.name, { toneType: 'none', type: 'string' }).replace(/\s/g, '').toLowerCase();
-                
-                console.log("辨識出的羅馬拼音:", spokenPinyin);
-                console.log("目標正確羅馬拼音:", targetPinyin);
-
-                if (spokenPinyin === targetPinyin) {
-                    statusMessage.textContent = `🎉 答對了！(拼音相符: ${targetPinyin})`;
-                    revealAnswer();
-                    return;
-                } else {
-                    statusMessage.textContent = `🤔 聽到拼音「${spokenPinyin}」，不是「${targetPinyin}」`;
-                    return;
-                }
-            } else {
-                // 若 pinyin-pro 模組未載入的備用文字比對
-                if (cleanText === currentPokemon.name) {
-                    statusMessage.textContent = `🎉 答對了！是 ${currentPokemon.name}！`;
-                    revealAnswer();
-                } else {
-                    statusMessage.textContent = `🤔 聽到的是「${cleanText}」，再試一次！`;
-                }
-            }
-        }
-
-        modeBtn.addEventListener('click', () => {
-            isReadingMode = !isReadingMode;
-            modeBtn.textContent = isReadingMode ? "切換為：拼音模式" : "切換為：認字模式";
-            loadRandomPokemon(); 
-        });
-
-        micBtn.addEventListener('click', () => {
-            if (recognition) {
-                // 如果已經在錄音中，不作任何處理，等待4秒自動結束
-                if (isRecording) return; 
-                
                 try {
-                    recognition.start(); 
-                } catch (e) {
-                    console.error(e);
+
+                    recognition.abort();
+
+                } catch (error) {
+
+                    console.warn(
+                        '換題時停止辨識失敗：',
+                        error
+                    );
+
                 }
+
+
+                resetMicButton();
+
             }
-        });
 
-        showBtn.addEventListener('click', () => {
-            revealAnswer();
-            statusMessage.textContent = `答案是：${currentPokemon.name}`;
-        });
 
-        nextBtn.addEventListener('click', () => {
-            loadRandomPokemon();
-        });
+            card.classList.remove(
+                'flipped'
+            );
+
+
+            pokemonImage.removeAttribute(
+                'src'
+            );
+
+
+            /*
+             * 認字模式
+             */
+            if (isReadingMode) {
+
+                bopomofoText.classList.add(
+                    'hide-zhuyin'
+                );
+
+
+                setStatus(
+                    '請唸出上面的國字'
+                );
+
+            }
+
+            /*
+             * 拼音模式
+             */
+            else {
+
+                bopomofoText.classList.remove(
+                    'hide-zhuyin'
+                );
+
+
+                setStatus(
+                    '請拼出上面的注音'
+                );
+
+            }
+
+
+            const randomIndex =
+                Math.floor(
+                    Math.random() *
+                    pokemonDB.length
+                );
+
+
+            currentPokemon =
+                pokemonDB[randomIndex];
+
+
+            bopomofoText.innerHTML =
+                generateZhuyinHTML(
+
+                    currentPokemon.name,
+
+                    currentPokemon.zhuyin
+
+                );
+
+
+            /*
+             * 輕微延遲載入下一張圖片，
+             * 避免換題時上一張圖片短暫閃現。
+             */
+            setTimeout(() => {
+
+                if (currentPokemon) {
+
+                    pokemonImage.src =
+                        currentPokemon.image;
+
+
+                    pokemonImage.alt =
+                        currentPokemon.name;
+
+                }
+
+            }, 200);
+
+        }
+
+
+        /*
+         * 翻牌並顯示答案
+         */
+        function revealAnswer() {
+
+            card.classList.add(
+                'flipped'
+            );
+
+
+            /*
+             * 認字模式答對後，
+             * 同時顯示注音答案。
+             */
+            bopomofoText.classList.remove(
+                'hide-zhuyin'
+            );
+
+        }
+
+
+        /*
+         * 清理語音辨識文字
+         */
+        function cleanRecognizedText(text) {
+
+            return String(
+                text || ''
+            )
+
+                .replace(
+                    /[^\u4e00-\u9fffA-Za-z0-9]/g,
+                    ''
+                )
+
+                .trim();
+
+        }
+
+
+        /*
+         * 中文轉成「無聲調羅馬拼音音節」
+         *
+         * 舊版會把：
+         *
+         * pi ka qiu
+         *
+         * 直接變成：
+         *
+         * pikaqiu
+         *
+         * 新版先保留：
+         *
+         * pi / ka / qiu
+         *
+         * 讓判斷更接近每個中文字的讀音。
+         */
+        function toPinyinSyllables(text) {
+
+            if (
+                !pinyinFn ||
+                !text
+            ) {
+
+                return [];
+
+            }
+
+
+            try {
+
+                const result =
+                    pinyinFn(
+                        text,
+                        {
+                            toneType: 'none',
+                            type: 'string'
+                        }
+                    );
+
+
+                return String(result)
+
+                    .toLowerCase()
+
+                    .trim()
+
+                    .split(/\s+/)
+
+                    .filter(Boolean);
+
+            }
+
+            catch (error) {
+
+                console.warn(
+                    '拼音轉換失敗：',
+                    error
+                );
+
+
+                return [];
+
+            }
+
+        }
+
+
+        /*
+         * Levenshtein Distance
+         *
+         * 用來計算兩個拼音有多少字母不同。
+         */
+        function levenshteinDistance(
+            a,
+            b
+        ) {
+
+            a = String(a || '');
+            b = String(b || '');
+
+
+            if (a === b) {
+
+                return 0;
+
+            }
+
+
+            if (!a.length) {
+
+                return b.length;
+
+            }
+
+
+            if (!b.length) {
+
+                return a.length;
+
+            }
+
+
+            const previous =
+                new Array(
+                    b.length + 1
+                );
+
+
+            const current =
+                new Array(
+                    b.length + 1
+                );
+
+
+            for (
+                let j = 0;
+                j <= b.length;
+                j++
+            ) {
+
+                previous[j] =
+                    j;
+
+            }
+
+
+            for (
+                let i = 1;
+                i <= a.length;
+                i++
+            ) {
+
+                current[0] =
+                    i;
+
+
+                for (
+                    let j = 1;
+                    j <= b.length;
+                    j++
+                ) {
+
+                    const cost =
+
+                        a[i - 1] ===
+                        b[j - 1]
+
+                            ? 0
+                            : 1;
+
+
+                    current[j] =
+                        Math.min(
+
+                            current[j - 1] + 1,
+
+                            previous[j] + 1,
+
+                            previous[j - 1] +
+                            cost
+
+                        );
+
+                }
+
+
+                for (
+                    let j = 0;
+                    j <= b.length;
+                    j++
+                ) {
+
+                    previous[j] =
+                        current[j];
+
+                }
+
+            }
+
+
+            return previous[
+                b.length
+            ];
+
+        }
+
+
+        /*
+         * 字串相似度
+         *
+         * 回傳 0～100
+         */
+        function stringSimilarity(
+            a,
+            b
+        ) {
+
+            a = String(a || '');
+            b = String(b || '');
+
+
+            if (
+                !a &&
+                !b
+            ) {
+
+                return 100;
+
+            }
+
+
+            if (
+                !a ||
+                !b
+            ) {
+
+                return 0;
+
+            }
+
+
+            if (a === b) {
+
+                return 100;
+
+            }
+
+
+            const maxLength =
+                Math.max(
+                    a.length,
+                    b.length
+                );
+
+
+            const distance =
+                levenshteinDistance(
+                    a,
+                    b
+                );
+
+
+            return Math.max(
+
+                0,
+
+                (
+                    1 -
+                    distance /
+                    maxLength
+                ) * 100
+
+            );
+
+        }
+
+
+        /*
+         * 比較一整組拼音音節
+         *
+         * 70%：
+         * 每一個音節個別比較
+         *
+         * 30%：
+         * 整串拼音比較
+         *
+         * 這樣可以兼顧：
+         * - 每個中文字的發音
+         * - 整個名稱的接近程度
+         */
+        function syllableSequenceScore(
+            spokenSyllables,
+            targetSyllables
+        ) {
+
+            if (
+                !spokenSyllables.length ||
+                !targetSyllables.length
+            ) {
+
+                return 0;
+
+            }
+
+
+            const spokenJoined =
+                spokenSyllables.join('');
+
+
+            const targetJoined =
+                targetSyllables.join('');
+
+
+            const wholeStringScore =
+                stringSimilarity(
+
+                    spokenJoined,
+
+                    targetJoined
+
+                );
+
+
+            const maxCount =
+                Math.max(
+
+                    spokenSyllables.length,
+
+                    targetSyllables.length
+
+                );
+
+
+            let syllableTotal = 0;
+
+
+            for (
+                let i = 0;
+                i < maxCount;
+                i++
+            ) {
+
+                const spoken =
+                    spokenSyllables[i] || '';
+
+
+                const target =
+                    targetSyllables[i] || '';
+
+
+                syllableTotal +=
+                    stringSimilarity(
+
+                        spoken,
+
+                        target
+
+                    );
+
+            }
+
+
+            const syllableScore =
+                syllableTotal /
+                maxCount;
+
+
+            return Math.round(
+
+                syllableScore * 0.7 +
+
+                wholeStringScore * 0.3
+
+            );
+
+        }
+
+
+        /*
+         * 找出最接近答案的拼音區段
+         *
+         * 例如孩子說：
+         *
+         * 「答案是皮卡丘」
+         *
+         * 語音辨識可能得到：
+         *
+         * da an shi pi ka qiu
+         *
+         * 程式會自動找出：
+         *
+         * pi ka qiu
+         *
+         * 來跟答案比較。
+         */
+        function getBestPinyinScore(
+            spokenText,
+            targetText
+        ) {
+
+            const spokenSyllables =
+                toPinyinSyllables(
+                    spokenText
+                );
+
+
+            const targetSyllables =
+                toPinyinSyllables(
+                    targetText
+                );
+
+
+            if (
+                !spokenSyllables.length ||
+                !targetSyllables.length
+            ) {
+
+                return {
+
+                    score: 0,
+
+                    spokenSyllables,
+
+                    targetSyllables,
+
+                    bestWindow: []
+
+                };
+
+            }
+
+
+            const targetLength =
+                targetSyllables.length;
+
+
+            let bestScore = 0;
+
+
+            let bestWindow =
+                spokenSyllables;
+
+
+            /*
+             * 如果辨識出來的句子
+             * 比答案長，
+             * 就逐段尋找最像答案的部分。
+             */
+            if (
+                spokenSyllables.length >=
+                targetLength
+            ) {
+
+                for (
+
+                    let start = 0;
+
+                    start <=
+                    spokenSyllables.length -
+                    targetLength;
+
+                    start++
+
+                ) {
+
+                    const window =
+                        spokenSyllables.slice(
+
+                            start,
+
+                            start +
+                            targetLength
+
+                        );
+
+
+                    const score =
+                        syllableSequenceScore(
+
+                            window,
+
+                            targetSyllables
+
+                        );
+
+
+                    if (
+                        score >
+                        bestScore
+                    ) {
+
+                        bestScore =
+                            score;
+
+
+                        bestWindow =
+                            window;
+
+                    }
+
+                }
+
+            }
+
+            else {
+
+                bestScore =
+                    syllableSequenceScore(
+
+                        spokenSyllables,
+
+                        targetSyllables
+
+                    );
+
+
+                bestWindow =
+                    spokenSyllables;
+
+            }
+
+
+            return {
+
+                score:
+                    Math.round(
+                        bestScore
+                    ),
+
+                spokenSyllables,
+
+                targetSyllables,
+
+                bestWindow
+
+            };
+
+        }
+
+
+        /*
+         * 判斷答案
+         */
+        function checkAnswer(
+            spokenText
+        ) {
+
+            if (!currentPokemon) {
+
+                return;
+
+            }
+
+
+            const cleanText =
+                cleanRecognizedText(
+                    spokenText
+                );
+
+
+            console.log(
+                '過濾後文字:',
+                cleanText
+            );
+
+
+            if (!cleanText) {
+
+                setStatus(
+                    '🤔 沒有聽清楚，再試一次唷！',
+                    'retry'
+                );
+
+
+                return;
+
+            }
+
+
+            /*
+             * 如果中文字剛好完全一致，
+             * 直接 100 分。
+             */
+            if (
+                cleanText ===
+                currentPokemon.name
+            ) {
+
+                console.log(
+                    '判定：中文字完全相同，100 分'
+                );
+
+
+                setStatus(
+                    `🎉 太棒了！答案是「${currentPokemon.name}」！`,
+                    'success'
+                );
+
+
+                revealAnswer();
+
+
+                return;
+
+            }
+
+
+            /*
+             * 主要判斷：
+             * 羅馬拼音相似度。
+             */
+            if (pinyinFn) {
+
+                const result =
+                    getBestPinyinScore(
+
+                        cleanText,
+
+                        currentPokemon.name
+
+                    );
+
+
+                /*
+                 * 這些資訊只留在 Console。
+                 *
+                 * 小朋友畫面不會看到
+                 * 羅馬拼音或百分比。
+                 */
+                console.group(
+                    '語音判分'
+                );
+
+
+                console.log(
+                    '辨識文字:',
+                    cleanText
+                );
+
+
+                console.log(
+                    '辨識拼音音節:',
+                    result.spokenSyllables
+                        .join(' / ')
+                );
+
+
+                console.log(
+                    '最佳比對音節:',
+                    result.bestWindow
+                        .join(' / ')
+                );
+
+
+                console.log(
+                    '目標拼音音節:',
+                    result.targetSyllables
+                        .join(' / ')
+                );
+
+
+                console.log(
+                    '相似度:',
+                    `${result.score}%`
+                );
+
+
+                console.groupEnd();
+
+
+                /*
+                 * 90～100：
+                 * 答對，直接翻牌。
+                 */
+                if (
+                    result.score >=
+                    SCORE_CORRECT
+                ) {
+
+                    setStatus(
+                        `🎉 太棒了！答案是「${currentPokemon.name}」！`,
+                        'success'
+                    );
+
+
+                    revealAnswer();
+
+                }
+
+
+                /*
+                 * 75～89：
+                 * 接近答案。
+                 */
+                else if (
+                    result.score >=
+                    SCORE_CLOSE
+                ) {
+
+                    setStatus(
+                        '😊 差一點點，再試一次！',
+                        'close'
+                    );
+
+                }
+
+
+                /*
+                 * 0～74：
+                 * 再試一次。
+                 */
+                else {
+
+                    setStatus(
+
+                        isReadingMode
+
+                            ? '💪 糟糕，再試著唸一次唷！'
+
+                            : '💪 糟糕，再試著拼一次唷！',
+
+                        'retry'
+
+                    );
+
+                }
+
+
+                return;
+
+            }
+
+
+            /*
+             * 如果 pinyin-pro 載入失敗，
+             * 至少保留基本中文判斷，
+             * 不讓遊戲完全不能玩。
+             */
+            if (
+                cleanText.includes(
+                    currentPokemon.name
+                )
+            ) {
+
+                setStatus(
+                    `🎉 太棒了！答案是「${currentPokemon.name}」！`,
+                    'success'
+                );
+
+
+                revealAnswer();
+
+            }
+
+            else {
+
+                setStatus(
+
+                    isReadingMode
+
+                        ? '💪 再試著唸一次唷！'
+
+                        : '💪 再試著拼一次唷！',
+
+                    'retry'
+
+                );
+
+            }
+
+        }
+
+
+        /*
+         * 切換拼音 / 認字模式
+         */
+        modeBtn.addEventListener(
+            'click',
+            () => {
+
+                isReadingMode =
+                    !isReadingMode;
+
+
+                modeBtn.textContent =
+
+                    isReadingMode
+
+                        ? '切換為：拼音模式'
+
+                        : '切換為：認字模式';
+
+
+                loadRandomPokemon();
+
+            }
+        );
+
+
+        /*
+         * 開始錄音
+         *
+         * 仍然維持：
+         *
+         * 點一次開始
+         * → 四秒內說話
+         * → 自動停止
+         */
+        micBtn.addEventListener(
+            'click',
+            () => {
+
+                if (
+                    !recognition ||
+                    isRecording
+                ) {
+
+                    return;
+
+                }
+
+
+                try {
+
+                    setStatus(
+                        '🎤 麥克風準備中...'
+                    );
+
+
+                    recognition.start();
+
+                }
+
+                catch (error) {
+
+                    console.warn(
+                        'recognition.start() 失敗：',
+                        error
+                    );
+
+
+                    resetMicButton();
+
+
+                    setStatus(
+                        '🎤 麥克風還沒準備好，請再按一次。',
+                        'retry'
+                    );
+
+                }
+
+            }
+        );
+
+
+        /*
+         * 看答案
+         */
+        showBtn.addEventListener(
+            'click',
+            () => {
+
+                if (!currentPokemon) {
+
+                    return;
+
+                }
+
+
+                revealAnswer();
+
+
+                setStatus(
+                    `答案是：${currentPokemon.name}`
+                );
+
+            }
+        );
+
+
+        /*
+         * 下一題
+         */
+        nextBtn.addEventListener(
+            'click',
+            () => {
+
+                loadRandomPokemon();
+
+            }
+        );
+
+
+        /*
+         * iPad / iPhone：
+         *
+         * 如果切到其他分頁、
+         * App 進入背景、
+         * 或裝置鎖定，
+         *
+         * 主動 abort 語音辨識，
+         * 降低麥克風殘留開啟的機率。
+         */
+        document.addEventListener(
+            'visibilitychange',
+            () => {
+
+                if (
+                    document.hidden &&
+                    isRecording &&
+                    recognition
+                ) {
+
+                    try {
+
+                        recognition.abort();
+
+                    }
+
+                    catch (error) {
+
+                        console.warn(
+                            '背景切換時中止辨識失敗：',
+                            error
+                        );
+
+                    }
+
+
+                    resetMicButton();
+
+                }
+
+            }
+        );
+
+
+        /*
+         * Safari 離開頁面
+         */
+        window.addEventListener(
+            'pagehide',
+            () => {
+
+                if (
+                    isRecording &&
+                    recognition
+                ) {
+
+                    try {
+
+                        recognition.abort();
+
+                    }
+
+                    catch (error) {
+
+                        console.warn(
+                            '離開頁面時中止辨識失敗：',
+                            error
+                        );
+
+                    }
+
+
+                    resetMicButton();
+
+                }
+
+            }
+        );
+
     </script>
+
 </body>
 </html>
