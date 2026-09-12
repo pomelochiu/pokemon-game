@@ -397,14 +397,14 @@
     <script src="dataset.js"></script>
     <script>
         /* =========================================================
-         * 寶可夢拼音 / 認字挑戰 V2
+         * 寶可夢拼音 / 認字挑戰 V3
          *
-         * V2 重點：
-         * 1. 以 dataset.js 的 zhuyin 作為正確發音標準。
-         * 2. SpeechRecognition 取得最多 5 個候選，選最高分。
-         * 3. 每次錄音建立新的 SpeechRecognition instance。
-         * 4. 保留 4 秒 stop()，再用 watchdog + abort() 收尾。
-         * 5. Console 記錄完整辨識與麥克風生命週期。
+         * V3 重點：
+         * 1. 題庫 zhuyin 仍是正確發音標準。
+         * 2. 先等待孩子真正開始說話，speechstart 後才計算 4 秒發音時間。
+         * 3. stop() 後延長 Safari 的處理時間，不再過早 abort。
+         * 4. 開啟 interimResults；若 Safari 沒有 final result，可用暫存結果救援。
+         * 5. 每次錄音建立新的 SpeechRecognition instance，並保留完整診斷紀錄。
          * ========================================================= */
 
         let currentPokemon = null;
@@ -413,10 +413,29 @@
 
         const SCORE_CORRECT = 90;
         const SCORE_CLOSE = 75;
-        const RECORDING_LIMIT_MS = 4000;
-        const STOP_WATCHDOG_MS = 1400;
-        const ABORT_SETTLE_MS = 700;
-        const END_AFTER_AUDIO_MS = 900;
+
+        /*
+         * V3 將「等待開始說話」與「真正說話時間」分開。
+         * onstart 後最多等 7 秒；一旦 speechstart，重新給完整 4 秒。
+         */
+        const WAIT_FOR_SPEECH_MS = 7000;
+        const SPEECH_RECORDING_MS = 4000;
+
+        /*
+         * stop() 後只監看音訊是否真的停止。
+         * V2 的 1.4 秒太積極，V3 拉長到 3.5 秒，避免 Safari 還在收尾就被 abort。
+         */
+        const AUDIO_STOP_WATCHDOG_MS = 3500;
+
+        /* audioend 已收到後，麥克風已停止擷取，可放心多等 final result。 */
+        const RESULT_WAIT_AFTER_AUDIO_MS = 5000;
+
+        /* Safari 偶爾 end 與 result 時序異常，end 後再留一點緩衝。 */
+        const END_RESULT_GRACE_MS = 1200;
+
+        /* 整個 session 的最終保險，避免任何事件都不回來時永久卡住。 */
+        const HARD_SESSION_LIMIT_MS = 18000;
+        const ABORT_SETTLE_MS = 900;
         const MAX_ALTERNATIVES = 5;
 
         const card = document.getElementById('pokemonCard');
@@ -953,7 +972,7 @@
         }
 
         /* =========================================================
-         * SpeechRecognition Session
+         * SpeechRecognition Session - V3
          * ========================================================= */
 
         function isCurrentSession(session) {
@@ -963,15 +982,21 @@
         function clearSessionTimers(session) {
             if (!session) return;
 
+            clearTimeout(session.preSpeechTimer);
             clearTimeout(session.recordingTimer);
-            clearTimeout(session.stopWatchdogTimer);
+            clearTimeout(session.audioStopWatchdogTimer);
+            clearTimeout(session.resultWaitTimer);
+            clearTimeout(session.endGraceTimer);
+            clearTimeout(session.hardLimitTimer);
             clearTimeout(session.abortSettleTimer);
-            clearTimeout(session.endAfterAudioTimer);
 
+            session.preSpeechTimer = null;
             session.recordingTimer = null;
-            session.stopWatchdogTimer = null;
+            session.audioStopWatchdogTimer = null;
+            session.resultWaitTimer = null;
+            session.endGraceTimer = null;
+            session.hardLimitTimer = null;
             session.abortSettleTimer = null;
-            session.endAfterAudioTimer = null;
         }
 
         function logLifecycle(session, eventName, extra = '') {
@@ -997,7 +1022,7 @@
             logLifecycle(
                 session,
                 'SESSION FINISH',
-                `audioEnd=${session.audioEnded} end=${session.serviceEnded} stop=${session.stopRequested} abort=${session.abortRequested}`
+                `speechStart=${session.speechStarted} audioEnd=${session.audioEnded} end=${session.serviceEnded} final=${session.finalResultHandled} interim=${Boolean(session.bestInterim)} stop=${session.stopRequested} abort=${session.abortRequested}`
             );
 
             if (
@@ -1006,10 +1031,10 @@
                 !session.userMessageHandled &&
                 !options.keepStatus
             ) {
-                setStatus('⏸️ 沒有收到辨識結果，再試一次唷！', 'retry');
+                setStatus('⏸️ 沒有收到語音辨識結果，再試一次唷！', 'retry');
             }
 
-            /* 讓舊 instance 失去參照，下一次一定建立新的 instance。 */
+            /* 下一次錄音一定建立新的 SpeechRecognition instance。 */
             session.recognition = null;
         }
 
@@ -1017,7 +1042,6 @@
             if (
                 !session ||
                 session.finished ||
-                session.serviceEnded ||
                 !session.recognition
             ) {
                 return;
@@ -1036,40 +1060,57 @@
 
             clearTimeout(session.abortSettleTimer);
             session.abortSettleTimer = setTimeout(() => {
-                if (!session.serviceEnded && !session.finished) {
+                if (!session.finished) {
                     console.warn(
-                        `[Speech #${session.id}] abort() 後仍未收到 end，強制釋放本次 instance。`
+                        `[Speech #${session.id}] abort() 後仍未完整結束，強制釋放本次 instance。`
                     );
                     finishSession(session, {
-                        keepStatus: session.resultHandled || session.userMessageHandled || session.cancelled
+                        keepStatus:
+                            session.resultHandled ||
+                            session.userMessageHandled ||
+                            session.cancelled
                     });
                 }
             }, ABORT_SETTLE_MS);
         }
 
-        function startStopWatchdog(session) {
-            clearTimeout(session.stopWatchdogTimer);
+        function startHardSessionWatchdog(session) {
+            clearTimeout(session.hardLimitTimer);
 
-            session.stopWatchdogTimer = setTimeout(() => {
-                if (session.finished || session.serviceEnded) {
-                    return;
+            session.hardLimitTimer = setTimeout(() => {
+                if (session.finished) return;
+
+                console.warn(
+                    `[Speech #${session.id}] 超過 ${HARD_SESSION_LIMIT_MS}ms 仍未結束，執行最終 abort。`
+                );
+
+                if (!session.resultHandled && !session.userMessageHandled) {
+                    session.userMessageHandled = true;
+                    setStatus('⏸️ 語音服務沒有回應，請再試一次唷！', 'retry');
                 }
 
-                /*
-                 * audioend 已代表瀏覽器停止擷取音訊。
-                 * 這時不需要再 abort 麥克風，只等 service end。
-                 */
-                if (session.audioEnded) {
-                    logLifecycle(session, 'WATCHDOG', 'audioend 已收到，等待 end');
+                forceAbortSession(session, 'hard session limit');
+            }, HARD_SESSION_LIMIT_MS);
+        }
+
+        function startAudioStopWatchdog(session) {
+            clearTimeout(session.audioStopWatchdogTimer);
+
+            session.audioStopWatchdogTimer = setTimeout(() => {
+                if (
+                    session.finished ||
+                    session.audioEnded ||
+                    session.serviceEnded
+                ) {
                     return;
                 }
 
                 console.warn(
-                    `[Speech #${session.id}] stop() 後 ${STOP_WATCHDOG_MS}ms 仍沒有 audioend/end，執行 abort()。`
+                    `[Speech #${session.id}] stop() 後 ${AUDIO_STOP_WATCHDOG_MS}ms 仍沒有 audioend/end，才執行 abort()。`
                 );
 
-                forceAbortSession(session, 'stop watchdog');
-            }, STOP_WATCHDOG_MS);
+                forceAbortSession(session, 'audio stop watchdog');
+            }, AUDIO_STOP_WATCHDOG_MS);
         }
 
         function requestStop(session, reason = 'timer', updateMessage = true) {
@@ -1083,11 +1124,11 @@
             }
 
             if (session.stopRequested) {
-                startStopWatchdog(session);
                 return;
             }
 
             session.stopRequested = true;
+            clearTimeout(session.preSpeechTimer);
             clearTimeout(session.recordingTimer);
 
             if (updateMessage && !session.cancelled) {
@@ -1105,7 +1146,11 @@
                 return;
             }
 
-            startStopWatchdog(session);
+            /*
+             * 這個 watchdog 只處理「音訊擷取沒有停」的情況。
+             * 不再像 V2 一樣很快就因為結果尚未回來而 abort。
+             */
+            startAudioStopWatchdog(session);
         }
 
         function cancelActiveRecognition(reason = 'cancel', silent = false) {
@@ -1126,24 +1171,29 @@
             }
         }
 
-        function collectAlternatives(event) {
-            const alternatives = [];
-            const seen = new Set();
+        function collectResultAlternatives(event) {
+            const finalAlternatives = [];
+            const interimAlternatives = [];
+            const finalSeen = new Set();
+            const interimSeen = new Set();
 
             if (!event || !event.results) {
-                return alternatives;
+                return { finalAlternatives, interimAlternatives };
             }
 
-            const startIndex = Number.isInteger(event.resultIndex)
-                ? event.resultIndex
-                : 0;
-
-            for (let resultIndex = startIndex; resultIndex < event.results.length; resultIndex++) {
+            for (let resultIndex = 0; resultIndex < event.results.length; resultIndex++) {
                 const result = event.results[resultIndex];
-
                 if (!result) continue;
 
-                for (let i = 0; i < result.length; i++) {
+                const destination = result.isFinal
+                    ? finalAlternatives
+                    : interimAlternatives;
+
+                const seen = result.isFinal
+                    ? finalSeen
+                    : interimSeen;
+
+                for (let i = 0; i < result.length && i < MAX_ALTERNATIVES; i++) {
                     const alternative = result[i];
                     const transcript = alternative && alternative.transcript
                         ? alternative.transcript.trim()
@@ -1154,7 +1204,7 @@
                     }
 
                     seen.add(transcript);
-                    alternatives.push({
+                    destination.push({
                         transcript,
                         confidence:
                             typeof alternative.confidence === 'number'
@@ -1164,27 +1214,13 @@
                 }
             }
 
-            return alternatives.slice(0, MAX_ALTERNATIVES);
+            return {
+                finalAlternatives: finalAlternatives.slice(0, MAX_ALTERNATIVES),
+                interimAlternatives: interimAlternatives.slice(0, MAX_ALTERNATIVES)
+            };
         }
 
-        function processRecognitionResult(session, event) {
-            if (
-                !isCurrentSession(session) ||
-                session.finished ||
-                session.cancelled ||
-                session.resultHandled
-            ) {
-                return;
-            }
-
-            const alternatives = collectAlternatives(event);
-
-            if (!alternatives.length) {
-                logLifecycle(session, 'RESULT', '沒有可用候選');
-                return;
-            }
-
-            const pokemon = session.targetPokemon;
+        function evaluateAlternatives(alternatives, pokemon) {
             const evaluations = alternatives.map((alternative, index) => {
                 const evaluation = evaluateTranscript(alternative.transcript, pokemon);
 
@@ -1203,11 +1239,11 @@
                 return (b.confidence || 0) - (a.confidence || 0);
             });
 
-            const best = evaluations[0];
-            session.resultHandled = true;
-            session.userMessageHandled = true;
+            return evaluations;
+        }
 
-            console.group(`🎤 Speech #${session.id}｜題目：${pokemon.name}`);
+        function logEvaluations(session, pokemon, evaluations, sourceLabel) {
+            console.group(`🎤 Speech #${session.id}｜題目：${pokemon.name}｜${sourceLabel}`);
             console.log('題庫標準注音：', getTargetZhuyin(pokemon).join(' / '));
             console.table(
                 evaluations.map(item => ({
@@ -1223,8 +1259,29 @@
                     文字直接命中: item.exactTextMatch ? 'YES' : ''
                 }))
             );
-            console.log('最佳候選：', best);
+            console.log('最佳候選：', evaluations[0]);
             console.groupEnd();
+        }
+
+        function applyEvaluations(session, evaluations, sourceLabel = 'FINAL') {
+            if (
+                !isCurrentSession(session) ||
+                session.finished ||
+                session.cancelled ||
+                session.resultHandled ||
+                !evaluations.length
+            ) {
+                return false;
+            }
+
+            const pokemon = session.targetPokemon;
+            const best = evaluations[0];
+
+            session.resultHandled = true;
+            session.userMessageHandled = true;
+            session.finalResultHandled = sourceLabel === 'FINAL';
+
+            logEvaluations(session, pokemon, evaluations, sourceLabel);
 
             if (
                 currentPokemon === pokemon &&
@@ -1243,11 +1300,120 @@
                 );
             }
 
+            return true;
+        }
+
+        function rememberInterimResult(session, alternatives) {
+            if (!alternatives.length || session.finished || session.resultHandled) {
+                return;
+            }
+
+            const evaluations = evaluateAlternatives(
+                alternatives,
+                session.targetPokemon
+            );
+
+            if (!evaluations.length) return;
+
+            const newestBest = evaluations[0];
+
             /*
-             * 有結果就要求停止收音。
-             * 這不會丟掉已經收到的 result，並可讓麥克風更早開始關閉。
+             * 保留目前分數最高的 interim。
+             * 如果分數相同，較新的結果取代舊結果。
              */
-            requestStop(session, 'result received', false);
+            if (
+                !session.bestInterim ||
+                newestBest.score >= session.bestInterim.evaluations[0].score
+            ) {
+                session.bestInterim = {
+                    evaluations,
+                    savedAt: performance.now()
+                };
+            }
+
+            logLifecycle(
+                session,
+                'interim',
+                `${newestBest.transcript} | score=${newestBest.score}%`
+            );
+
+            if (isCurrentSession(session) && !session.cancelled) {
+                setStatus('🎙️ 有聽到聲音，請把答案說完');
+            }
+        }
+
+        function useInterimFallback(session, reason = 'no final result') {
+            if (
+                !session ||
+                session.finished ||
+                session.resultHandled ||
+                !session.bestInterim
+            ) {
+                return false;
+            }
+
+            logLifecycle(session, 'INTERIM FALLBACK', reason);
+
+            return applyEvaluations(
+                session,
+                session.bestInterim.evaluations,
+                'INTERIM FALLBACK'
+            );
+        }
+
+        function processRecognitionResult(session, event) {
+            if (
+                !isCurrentSession(session) ||
+                session.finished ||
+                session.cancelled ||
+                session.resultHandled
+            ) {
+                return;
+            }
+
+            const {
+                finalAlternatives,
+                interimAlternatives
+            } = collectResultAlternatives(event);
+
+            if (finalAlternatives.length) {
+                const evaluations = evaluateAlternatives(
+                    finalAlternatives,
+                    session.targetPokemon
+                );
+
+                if (applyEvaluations(session, evaluations, 'FINAL')) {
+                    requestStop(session, 'final result received', false);
+                }
+                return;
+            }
+
+            if (interimAlternatives.length) {
+                rememberInterimResult(session, interimAlternatives);
+            }
+        }
+
+        function scheduleResultWaitAfterAudioEnd(session) {
+            clearTimeout(session.resultWaitTimer);
+
+            session.resultWaitTimer = setTimeout(() => {
+                if (session.finished || session.resultHandled) {
+                    return;
+                }
+
+                /*
+                 * audioend 代表麥克風已停止擷取，這時可以安全等待辨識服務。
+                 * 如果 5 秒後仍沒有 final，優先使用途中保存的 interim。
+                 */
+                if (useInterimFallback(session, 'audioend 後仍沒有 final result')) {
+                    forceAbortSession(session, 'interim fallback completed');
+                    return;
+                }
+
+                session.userMessageHandled = true;
+                setStatus('⏸️ 沒有收到語音辨識結果，再試一次唷！', 'retry');
+                forceAbortSession(session, 'result wait timeout');
+            }, RESULT_WAIT_AFTER_AUDIO_MS);
         }
 
         function createRecognitionSession() {
@@ -1270,17 +1436,27 @@
                 stopRequested: false,
                 abortRequested: false,
                 resultHandled: false,
+                finalResultHandled: false,
                 userMessageHandled: false,
                 cancelled: false,
                 finished: false,
+                bestInterim: null,
+                preSpeechTimer: null,
                 recordingTimer: null,
-                stopWatchdogTimer: null,
-                abortSettleTimer: null,
-                endAfterAudioTimer: null
+                audioStopWatchdogTimer: null,
+                resultWaitTimer: null,
+                endGraceTimer: null,
+                hardLimitTimer: null,
+                abortSettleTimer: null
             };
 
             recognition.lang = 'zh-TW';
-            recognition.interimResults = false;
+
+            /*
+             * V3 開啟 interimResults。
+             * 這不會直接把暫存結果判成答案；只有 final 缺席時才作為救援。
+             */
+            recognition.interimResults = true;
             recognition.maxAlternatives = MAX_ALTERNATIVES;
             recognition.continuous = false;
 
@@ -1290,13 +1466,23 @@
                 session.started = true;
                 logLifecycle(session, 'start');
 
-                setStatus('👂 正在聽... 請開始說話');
+                setStatus('👂 麥克風已開啟，準備好再開始說話');
                 setMicBusy(true, '⏹️ 錄音中...');
 
-                clearTimeout(session.recordingTimer);
-                session.recordingTimer = setTimeout(() => {
-                    requestStop(session, '4 秒上限', true);
-                }, RECORDING_LIMIT_MS);
+                /*
+                 * V2 從這一刻就開始算 4 秒。
+                 * V3 改成这里只負責等待 speechstart，最多等待 7 秒。
+                 */
+                clearTimeout(session.preSpeechTimer);
+                session.preSpeechTimer = setTimeout(() => {
+                    if (!session.speechStarted && !session.finished) {
+                        session.userMessageHandled = true;
+                        setStatus('👂 還沒有聽到說話聲，再試一次唷！', 'retry');
+                        requestStop(session, '等待說話逾時', false);
+                    }
+                }, WAIT_FOR_SPEECH_MS);
+
+                startHardSessionWatchdog(session);
             };
 
             recognition.onaudiostart = () => {
@@ -1312,6 +1498,17 @@
                 session.speechStarted = true;
                 logLifecycle(session, 'speechstart');
 
+                clearTimeout(session.preSpeechTimer);
+
+                /*
+                 * 真正聽到孩子開始說話後，才重新給完整 4 秒。
+                 * 這是 V3 最主要的時間修正。
+                 */
+                clearTimeout(session.recordingTimer);
+                session.recordingTimer = setTimeout(() => {
+                    requestStop(session, 'speechstart 後 4 秒上限', true);
+                }, SPEECH_RECORDING_MS);
+
                 if (isCurrentSession(session) && !session.cancelled) {
                     setStatus('🎙️ 收到聲音了，請把答案說完');
                 }
@@ -1326,8 +1523,13 @@
                     !session.cancelled &&
                     !session.resultHandled
                 ) {
-                    setStatus('⏳ 語音分析中，請稍候...');
+                    setStatus('⏳ 已收到語音，正在分析...');
                 }
+
+                /*
+                 * 不在 speechend 立刻 stop，避免 Safari 因短暫停頓過早切斷。
+                 * 仍由 speechstart 後的 4 秒上限或瀏覽器自然結束來收尾。
+                 */
             };
 
             recognition.onsoundend = () => {
@@ -1338,31 +1540,23 @@
                 session.audioEnded = true;
                 logLifecycle(session, 'audioend');
 
-                clearTimeout(session.stopWatchdogTimer);
+                clearTimeout(session.audioStopWatchdogTimer);
+                clearTimeout(session.preSpeechTimer);
+                clearTimeout(session.recordingTimer);
 
                 /*
-                 * audioend = 瀏覽器已停止擷取聲音。
-                 * 如果 Safari 沒再送 end，稍後只釋放 UI / instance，
-                 * 不需要再 abort 已經停止的 audio capture。
+                 * 到這裡代表瀏覽器已停止擷取麥克風。
+                 * 不急著 abort，讓 Safari 有最多 5 秒把 final result 送回來。
                  */
-                clearTimeout(session.endAfterAudioTimer);
-                session.endAfterAudioTimer = setTimeout(() => {
-                    if (!session.serviceEnded && !session.finished) {
-                        console.warn(
-                            `[Speech #${session.id}] 已收到 audioend，但沒有 end；釋放本次 instance。`
-                        );
-                        finishSession(session, {
-                            keepStatus:
-                                session.resultHandled ||
-                                session.userMessageHandled ||
-                                session.cancelled
-                        });
-                    }
-                }, END_AFTER_AUDIO_MS);
+                if (!session.resultHandled) {
+                    setStatus('⏳ 收音完成，正在辨識答案...');
+                    scheduleResultWaitAfterAudioEnd(session);
+                }
             };
 
             recognition.onresult = event => {
-                logLifecycle(session, 'result');
+                const hasFinal = Array.from(event.results || []).some(result => result && result.isFinal);
+                logLifecycle(session, hasFinal ? 'result(final)' : 'result(interim)');
                 processRecognitionResult(session, event);
             };
 
@@ -1370,6 +1564,12 @@
                 logLifecycle(session, 'nomatch');
 
                 if (!isCurrentSession(session) || session.cancelled) return;
+
+                /* 如果之前曾有 interim，先讓它救援。 */
+                if (useInterimFallback(session, 'nomatch')) {
+                    requestStop(session, 'nomatch + interim fallback', false);
+                    return;
+                }
 
                 session.userMessageHandled = true;
                 setStatus('🤔 沒有聽清楚，再試一次唷！', 'retry');
@@ -1393,6 +1593,16 @@
                     return;
                 }
 
+                /* 某些 Safari 錯誤前可能已經送過 interim，可先救援。 */
+                if (
+                    errorName !== 'not-allowed' &&
+                    errorName !== 'service-not-allowed' &&
+                    useInterimFallback(session, `error: ${errorName}`)
+                ) {
+                    forceAbortSession(session, `error after interim: ${errorName}`);
+                    return;
+                }
+
                 session.userMessageHandled = true;
 
                 if (errorName === 'no-speech') {
@@ -1410,11 +1620,6 @@
                     setStatus('❌ 收音沒有成功，請再試一次。', 'error');
                 }
 
-                /*
-                 * error 後不要只等 Safari 自己送 end。
-                 * 此時已經沒有需要保留的辨識結果，直接 abort 收尾；
-                 * 若 Safari 仍不送 end，ABORT_SETTLE_MS 後會釋放 instance。
-                 */
                 if (errorName !== 'aborted') {
                     forceAbortSession(session, `error: ${errorName}`);
                 }
@@ -1424,21 +1629,43 @@
                 session.serviceEnded = true;
                 logLifecycle(session, 'end');
 
+                clearTimeout(session.audioStopWatchdogTimer);
+                clearTimeout(session.resultWaitTimer);
+                clearTimeout(session.preSpeechTimer);
+                clearTimeout(session.recordingTimer);
+
                 if (!isCurrentSession(session)) {
                     clearSessionTimers(session);
                     return;
                 }
 
-                if (
-                    !session.cancelled &&
-                    !session.resultHandled &&
-                    !session.userMessageHandled
-                ) {
-                    setStatus('⏸️ 沒有收到辨識結果，再試一次唷！', 'retry');
-                    session.userMessageHandled = true;
+                if (session.resultHandled || session.cancelled) {
+                    finishSession(session, { keepStatus: true });
+                    return;
                 }
 
-                finishSession(session, { keepStatus: true });
+                /*
+                 * Safari 偶爾事件時序不漂亮；end 後先留 1.2 秒，
+                 * 若仍沒有 final，再使用 interim 或顯示「沒有收到結果」。
+                 */
+                clearTimeout(session.endGraceTimer);
+                session.endGraceTimer = setTimeout(() => {
+                    if (session.finished || session.resultHandled) {
+                        return;
+                    }
+
+                    if (useInterimFallback(session, 'end 後沒有 final result')) {
+                        finishSession(session, { keepStatus: true });
+                        return;
+                    }
+
+                    if (!session.userMessageHandled) {
+                        session.userMessageHandled = true;
+                        setStatus('⏸️ 沒有收到語音辨識結果，再試一次唷！', 'retry');
+                    }
+
+                    finishSession(session, { keepStatus: true });
+                }, END_RESULT_GRACE_MS);
             };
 
             return session;
@@ -1464,6 +1691,8 @@
             console.log('題目：', session.targetPokemon.name);
             console.log('標準注音：', getTargetZhuyin(session.targetPokemon).join(' / '));
             console.log('maxAlternatives：', MAX_ALTERNATIVES);
+            console.log('等待開始說話：', `${WAIT_FOR_SPEECH_MS}ms`);
+            console.log('speechstart 後發音時間：', `${SPEECH_RECORDING_MS}ms`);
             console.groupEnd();
 
             try {
