@@ -5,7 +5,7 @@ const pokemonDB = [
             "ㄇㄧㄠˋ",
             "ㄨㄚ",
             "ㄓㄨㄥˇ",
-            "ㄗ˙"
+            "ㄗˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png"
     },
@@ -1714,7 +1714,7 @@ const pokemonDB = [
             "ㄒㄧㄤˋ",
             "ㄖˋ",
             "ㄓㄨㄥˇ",
-            "ㄗ˙"
+            "ㄗˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/191.png"
     },
@@ -2434,7 +2434,7 @@ const pokemonDB = [
             "ㄌㄧㄢˊ",
             "ㄧㄝˋ",
             "ㄊㄨㄥˊ",
-            "ㄗ˙"
+            "ㄗˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/270.png"
     },
@@ -3288,7 +3288,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄒㄩㄝˇ",
             "ㄊㄨㄥˊ",
-            "ㄗ˙"
+            "ㄗˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/361.png"
     },
@@ -3596,7 +3596,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄅㄛ",
             "ㄏㄨㄤˊ",
-            "ㄗ˙"
+            "ㄗˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/394.png"
     },
@@ -5502,7 +5502,7 @@ const pokemonDB = [
         "name": "種子鐵球",
         "zhuyin": [
             "ㄓㄨㄥˇ",
-            "ㄗ˙",
+            "ㄗˇ",
             "ㄊㄧㄝˇ",
             "ㄑㄧㄡˊ"
         ],
@@ -6477,7 +6477,7 @@ const pokemonDB = [
         "name": "仙子伊布",
         "zhuyin": [
             "ㄒㄧㄢ",
-            "ㄗ˙",
+            "ㄗˇ",
             "ㄧ",
             "ㄅㄨˋ"
         ],
