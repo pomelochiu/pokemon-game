@@ -199,7 +199,7 @@ const pokemonDB = [
         "name": "阿柏蛇",
         "zhuyin": [
             "ㄚ",
-            "ㄅㄞˇ",
+            "ㄅㄛˊ",
             "ㄕㄜˊ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/23.png"
@@ -208,7 +208,7 @@ const pokemonDB = [
         "name": "阿柏怪",
         "zhuyin": [
             "ㄚ",
-            "ㄅㄞˇ",
+            "ㄅㄛˊ",
             "ㄍㄨㄞˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/24.png"
@@ -4092,7 +4092,7 @@ const pokemonDB = [
         "name": "路卡利歐",
         "zhuyin": [
             "ㄌㄨˋ",
-            "ㄑㄧㄚˇ",
+            "ㄎㄚˇ",
             "ㄌㄧˋ",
             "ㄡ"
         ],
