@@ -9200,7 +9200,7 @@ const pokemonDB = [
         "name": "鐵轍跡",
         "zhuyin": [
             "ㄊㄧㄝˇ",
-            "ㄓㄜˊ",
+            "ㄔㄜˋ",
             "ㄐㄧ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/990.png"
