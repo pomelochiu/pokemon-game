@@ -6940,7 +6940,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄋㄧˊ",
             "ㄌㄩˊ",
-            "ㄗㄞˇ"
+            "ㄗˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/749.png"
     },
@@ -7781,7 +7781,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄒㄧㄠˇ",
             "ㄊㄢˋ",
-            "ㄗㄞˇ"
+            "ㄗˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/837.png"
     },
@@ -8613,7 +8613,7 @@ const pokemonDB = [
         "name": "狗仔包",
         "zhuyin": [
             "ㄍㄡˇ",
-            "ㄗㄞˇ",
+            "ㄗˇ",
             "ㄅㄠ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/926.png"
@@ -8725,7 +8725,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄍㄨㄤ",
             "ㄉㄡˇ",
-            "ㄗㄞˇ"
+            "ㄗˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/938.png"
     },
@@ -9029,7 +9029,7 @@ const pokemonDB = [
         "name": "墓仔狗",
         "zhuyin": [
             "ㄇㄨˋ",
-            "ㄗㄞˇ",
+            "ㄗˇ",
             "ㄍㄡˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/971.png"
