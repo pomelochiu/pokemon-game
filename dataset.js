@@ -3051,7 +3051,7 @@ const pokemonDB = [
         "name": "飯匙蛇",
         "zhuyin": [
             "ㄈㄢˋ",
-            "ㄕ˙",
+            "ㄔˊ",
             "ㄕㄜˊ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/336.png"
