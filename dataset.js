@@ -7304,8 +7304,8 @@ const pokemonDB = [
             "ㄎㄚˇ",
             "ㄆㄨˊ",
             "・",
-            "ㄇㄡ",
-            "ㄇㄡ"
+            "ㄇㄡˊ",
+            "ㄇㄡˊ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/787.png"
     },
