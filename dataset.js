@@ -9174,7 +9174,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄓㄣˋ",
             "ㄧˋ",
-            "ㄈㄚˋ"
+            "ㄈㄚˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/987.png"
     },
