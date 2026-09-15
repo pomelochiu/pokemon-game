@@ -3213,7 +3213,7 @@ const pokemonDB = [
             "ㄩㄢˋ",
             "ㄧㄥˇ",
             "ㄨㄚˊ",
-            "ㄨㄚˊ"
+            "ㄨㄚ˙"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/353.png"
     },
@@ -3223,7 +3223,7 @@ const pokemonDB = [
             "ㄗㄨˇ",
             "ㄓㄡˋ",
             "ㄨㄚˊ",
-            "ㄨㄚˊ"
+            "ㄨㄚ˙"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/354.png"
     },
@@ -4866,11 +4866,11 @@ const pokemonDB = [
     {
         "name": "差不多娃娃",
         "zhuyin": [
-            "ㄔㄚˋ",
-            "ㄅㄨ˙",
+            "ㄔㄚ",
+            "ㄅㄨˋ",
             "ㄉㄨㄛ",
             "ㄨㄚˊ",
-            "ㄨㄚˊ"
+            "ㄨㄚ˙"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/531.png"
     },
@@ -5029,7 +5029,7 @@ const pokemonDB = [
             "ㄏㄜˊ",
             "ㄍㄣ",
             "ㄨㄚˊ",
-            "ㄨㄚˊ"
+            "ㄨㄚ˙"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/548.png"
     },
