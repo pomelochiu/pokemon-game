@@ -6,7 +6,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>寶可夢拼音/認字挑戰</title>
-    <script src="https://unpkg.com/pinyin-pro"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.min.js"
+        integrity="sha512-MvP/4MeY8BO3JanwrBm/qUF4gDi/oaZlVG4rKQU/sGOg8STU20puDMlCqF0G+CeXVGWZJ3MI8tv+q1+8QoiDdg=="
+        crossorigin="anonymous"></script>
 
     <style>
         * {
@@ -169,6 +172,16 @@
             display: flex;
             flex-direction: row;
             align-items: center;
+        }
+
+        /* ：、・、．等只負責顯示，不再產生一欄「假注音」。 */
+        .char-block.symbol-only {
+            justify-content: center;
+        }
+
+        .char-block.symbol-only .char-text {
+            font-size: clamp(36px, 5.2vw, 58px);
+            font-weight: 700;
         }
 
         .char-text {
@@ -379,7 +392,7 @@
                     <div class="pokeball"></div>
                 </div>
                 <div class="card-face card-front">
-                    <img id="pokemonImage" src="" alt="Pokemon">
+                    <img id="pokemonImage" src="" alt="Pokemon" decoding="async" fetchpriority="high">
                 </div>
             </div>
         </div>
@@ -397,14 +410,16 @@
     <script src="dataset.js"></script>
     <script>
         /* =========================================================
-         * 寶可夢拼音 / 認字挑戰 V3
+         * 寶可夢拼音 / 認字挑戰 V4
          *
-         * V3 重點：
-         * 1. 題庫 zhuyin 仍是正確發音標準。
-         * 2. 先等待孩子真正開始說話，speechstart 後才計算 4 秒發音時間。
-         * 3. stop() 後延長 Safari 的處理時間，不再過早 abort。
-         * 4. 開啟 interimResults；若 Safari 沒有 final result，可用暫存結果救援。
-         * 5. 每次錄音建立新的 SpeechRecognition instance，並保留完整診斷紀錄。
+         * V4 重點：
+         * 1. 保留 V3 的 SpeechRecognition session / interim fallback 架構。
+         * 2. ：、・、．等「無聲符號」只顯示，不顯示假注音、不參與判分。
+         * 3. Ｑ、Ｚ、Ⅱ 等非注音字元保留官方名稱顯示，但不讓它們拉低注音相似度。
+         * 4. speechend 後給短暫靜音緩衝，孩子講完即可提早 stop，不必一直等滿上限。
+         * 5. 最長說話時間依實際發音音節數動態調整，四、五字名稱有更充裕時間。
+         * 6. 題庫啟動時自動健康檢查；隨機題目改為一輪不重複。
+         * 7. 寶可夢圖片提前載入；pinyin-pro 固定為 3.28.1。
          * ========================================================= */
 
         let currentPokemon = null;
@@ -414,29 +429,37 @@
         const SCORE_CORRECT = 90;
         const SCORE_CLOSE = 75;
 
-        /*
-         * V3 將「等待開始說話」與「真正說話時間」分開。
-         * onstart 後最多等 7 秒；一旦 speechstart，重新給完整 4 秒。
-         */
+        /* 等待孩子真正開始說話的最大時間。 */
         const WAIT_FOR_SPEECH_MS = 7000;
-        const SPEECH_RECORDING_MS = 4000;
 
         /*
-         * stop() 後只監看音訊是否真的停止。
-         * V2 的 1.4 秒太積極，V3 拉長到 3.5 秒，避免 Safari 還在收尾就被 abort。
+         * speechend 後不立即 stop：
+         * 給孩子約 1.1 秒的短暫停頓空間，避免字與字之間停頓被誤切斷。
          */
+        const SPEECH_END_GRACE_MS = 1100;
+
+        /* stop() 後，若 Safari 連 audioend/end 都沒有，再執行 abort。 */
         const AUDIO_STOP_WATCHDOG_MS = 3500;
 
-        /* audioend 已收到後，麥克風已停止擷取，可放心多等 final result。 */
+        /* audioend 已收到後，麥克風已停止擷取，可放心等待 final result。 */
         const RESULT_WAIT_AFTER_AUDIO_MS = 5000;
 
         /* Safari 偶爾 end 與 result 時序異常，end 後再留一點緩衝。 */
         const END_RESULT_GRACE_MS = 1200;
 
-        /* 整個 session 的最終保險，避免任何事件都不回來時永久卡住。 */
-        const HARD_SESSION_LIMIT_MS = 18000;
+        /* 整個 session 的最終保險。動態錄音上限提高後，總上限也略放寬。 */
+        const HARD_SESSION_LIMIT_MS = 22000;
         const ABORT_SETTLE_MS = 900;
         const MAX_ALTERNATIVES = 5;
+
+        /* 名稱中這些符號有視覺意義，但沒有發音。 */
+        const SILENT_NAME_SYMBOLS = new Set([
+            '：', ':', '・', '．', '.', '·', '•', '‧'
+        ]);
+
+        /* 一輪不重複抽題。 */
+        let questionBag = [];
+        let lastPokemon = null;
 
         const card = document.getElementById('pokemonCard');
         const pokemonImage = document.getElementById('pokemonImage');
@@ -466,6 +489,143 @@
             micBtn.setAttribute('aria-pressed', isBusy ? 'true' : 'false');
         }
 
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function isSilentNameSymbol(char) {
+            return SILENT_NAME_SYMBOLS.has(String(char || ''));
+        }
+
+        function isRealZhuyin(value) {
+            return /[ㄅ-ㄩ]/.test(normalizeZhuyinSyllable(value));
+        }
+
+        function getPronounceableSyllableCount(pokemon) {
+            return getTargetZhuyin(pokemon).length;
+        }
+
+        /*
+         * 依真正要念的音節數設定「最長說話時間」。
+         * speechend 通常會讓錄音提早結束，所以這只是安全上限。
+         */
+        function getSpeechRecordingLimitMs(pokemon) {
+            const count = getPronounceableSyllableCount(pokemon);
+
+            if (count <= 2) return 3500;
+            if (count === 3) return 4200;
+            if (count === 4) return 5000;
+            return 5800;
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function refillQuestionBag() {
+            questionBag = shuffleArray([...pokemonDB]);
+
+            /* 新一輪的第一題避免剛好等於上一輪最後一題。 */
+            if (
+                lastPokemon &&
+                questionBag.length > 1 &&
+                questionBag[questionBag.length - 1] === lastPokemon
+            ) {
+                [questionBag[0], questionBag[questionBag.length - 1]] =
+                    [questionBag[questionBag.length - 1], questionBag[0]];
+            }
+        }
+
+        function drawNextPokemon() {
+            if (!questionBag.length) {
+                refillQuestionBag();
+            }
+
+            const pokemon = questionBag.pop();
+            lastPokemon = pokemon;
+            return pokemon;
+        }
+
+        function preloadUpcomingImage() {
+            if (!questionBag.length) return;
+            const nextPokemon = questionBag[questionBag.length - 1];
+            if (!nextPokemon || !nextPokemon.image) return;
+
+            const img = new Image();
+            img.src = nextPokemon.image;
+        }
+
+        function validateDataset() {
+            if (!Array.isArray(pokemonDB)) return;
+
+            const issues = [];
+            const specialTokens = [];
+            const names = new Set();
+
+            pokemonDB.forEach((pokemon, index) => {
+                const position = index + 1;
+                const chars = Array.from(String(pokemon && pokemon.name || ''));
+                const zhuyin = pokemon && Array.isArray(pokemon.zhuyin)
+                    ? pokemon.zhuyin
+                    : [];
+
+                if (!pokemon || !pokemon.name) {
+                    issues.push(`#${position} 缺少 name`);
+                    return;
+                }
+
+                if (!Array.isArray(pokemon.zhuyin)) {
+                    issues.push(`${pokemon.name}：zhuyin 不是陣列`);
+                } else if (chars.length !== zhuyin.length) {
+                    issues.push(
+                        `${pokemon.name}：名稱 ${chars.length} 個字元，但 zhuyin 有 ${zhuyin.length} 個項目`
+                    );
+                }
+
+                if (!pokemon.image) {
+                    issues.push(`${pokemon.name}：缺少 image`);
+                }
+
+                if (names.has(pokemon.name)) {
+                    issues.push(`${pokemon.name}：名稱重複`);
+                }
+                names.add(pokemon.name);
+
+                chars.forEach((char, charIndex) => {
+                    const bpmf = zhuyin[charIndex] || '';
+                    if (isSilentNameSymbol(char)) {
+                        specialTokens.push(`${pokemon.name}：${char}（無聲顯示符號）`);
+                    } else if (!isRealZhuyin(bpmf)) {
+                        specialTokens.push(`${pokemon.name}：${char} / ${bpmf || '空白'}（特殊名稱字元）`);
+                    }
+                });
+            });
+
+            console.groupCollapsed(`🧪 題庫健康檢查｜${pokemonDB.length} 筆`);
+            if (issues.length) {
+                console.warn(`發現 ${issues.length} 個結構問題：`);
+                issues.forEach(item => console.warn(item));
+            } else {
+                console.log('✅ name / zhuyin / image 基本結構檢查通過');
+            }
+
+            if (specialTokens.length) {
+                console.log('特殊字元（V4 會安全處理）：');
+                specialTokens.forEach(item => console.log(item));
+            }
+            console.groupEnd();
+        }
+
         window.addEventListener('load', () => {
             if (window.pinyinPro && window.pinyinPro.pinyin) {
                 pinyinFn = window.pinyinPro.pinyin;
@@ -474,6 +634,8 @@
             }
 
             if (typeof pokemonDB !== 'undefined' && pokemonDB.length > 0) {
+                validateDataset();
+                refillQuestionBag();
                 loadRandomPokemon();
             } else {
                 setStatus('⏳ 找不到題庫，請確認 dataset.js 是否正確載入。', 'error');
@@ -491,10 +653,38 @@
 
         function generateZhuyinHTML(name, zhuyinArray) {
             let html = '';
+            const chars = Array.from(String(name || ''));
 
-            for (let i = 0; i < name.length; i++) {
-                const char = name[i];
+            for (let i = 0; i < chars.length; i++) {
+                const char = chars[i];
                 const bpmf = zhuyinArray[i] || '';
+
+                /*
+                 * ：、・、．等符號只顯示名稱本身。
+                 * 不建立 zhuyin-col，因此不會再看到「大冒號旁邊一個小冒號」。
+                 */
+                if (isSilentNameSymbol(char)) {
+                    html += `
+                        <div class="char-block symbol-only" aria-hidden="true">
+                            <div class="char-text">${escapeHtml(char)}</div>
+                        </div>
+                    `;
+                    continue;
+                }
+
+                /*
+                 * Ｑ、Ｚ、Ⅱ 等特殊名稱字元目前保留官方顯示，
+                 * 但 dataset 中並不是注音，因此不硬畫成「注音」。
+                 */
+                if (!isRealZhuyin(bpmf)) {
+                    html += `
+                        <div class="char-block symbol-only">
+                            <div class="char-text">${escapeHtml(char)}</div>
+                        </div>
+                    `;
+                    continue;
+                }
+
                 let tone = '';
                 let lightTone = '';
                 let mainBpmf = bpmf;
@@ -512,12 +702,12 @@
 
                 const bpmfSpans = mainBpmf
                     .split('')
-                    .map(b => `<span>${b}</span>`)
+                    .map(b => `<span>${escapeHtml(b)}</span>`)
                     .join('');
 
                 html += `
                     <div class="char-block">
-                        <div class="char-text">${char}</div>
+                        <div class="char-text">${escapeHtml(char)}</div>
                         <div class="zhuyin-col">
                             ${lightTone ? `<div class="tone-light">${lightTone}</div>` : ''}
                             <div class="bpmf-stack">${bpmfSpans}</div>
@@ -553,27 +743,19 @@
                 setStatus('請拼出上面的注音');
             }
 
-            const randomIndex = Math.floor(Math.random() * pokemonDB.length);
-            currentPokemon = pokemonDB[randomIndex];
+            currentPokemon = drawNextPokemon();
 
             bopomofoText.innerHTML = generateZhuyinHTML(
                 currentPokemon.name,
                 currentPokemon.zhuyin
             );
 
-            const imageUrl = currentPokemon.image;
-            const imageName = currentPokemon.name;
+            /* 卡牌背面顯示期間就開始載入圖片，答對翻牌時較不容易白一下。 */
+            pokemonImage.src = currentPokemon.image;
+            pokemonImage.alt = currentPokemon.name;
 
-            setTimeout(() => {
-                if (
-                    currentPokemon &&
-                    currentPokemon.image === imageUrl &&
-                    currentPokemon.name === imageName
-                ) {
-                    pokemonImage.src = imageUrl;
-                    pokemonImage.alt = imageName;
-                }
-            }, 200);
+            /* 順便預載下一題的圖片。 */
+            preloadUpcomingImage();
         }
 
         /* =========================================================
@@ -592,8 +774,25 @@
                 return [];
             }
 
+            const chars = Array.from(String(pokemon.name || ''));
+
             return pokemon.zhuyin
-                .map(normalizeZhuyinSyllable)
+                .map((value, index) => {
+                    const char = chars[index] || '';
+
+                    /* ：、・等無聲符號完全不參與發音答案。 */
+                    if (isSilentNameSymbol(char)) {
+                        return '';
+                    }
+
+                    const normalized = normalizeZhuyinSyllable(value);
+
+                    /*
+                     * Ｑ、Ｚ、Ⅱ 等不是注音字串：保留名稱顯示，但不讓它們
+                     * 被錯當成一個注音音節，避免莫名拉低相似度。
+                     */
+                    return /[ㄅ-ㄩ]/.test(normalized) ? normalized : '';
+                })
                 .filter(Boolean);
         }
 
@@ -762,10 +961,17 @@
             return '';
         }
 
-        function cleanRecognizedText(text) {
+        function normalizeNameForComparison(text) {
             return String(text || '')
-                .replace(/[^\u3400-\u9fffA-Za-z0-9üÜ:]/g, '')
+                .normalize('NFKC')
+                .replace(/[：:・．.·•‧\s]/g, '')
+                .replace(/[^\u3400-\u9fffA-Za-z0-9üÜ]/g, '')
+                .toLowerCase()
                 .trim();
+        }
+
+        function cleanRecognizedText(text) {
+            return normalizeNameForComparison(text);
         }
 
         function recognizedTextToZhuyin(text) {
@@ -776,7 +982,9 @@
             try {
                 const pinyinArray = pinyinFn(text, {
                     toneType: 'none',
-                    type: 'array'
+                    type: 'array',
+                    /* Q / Z / 數字等非中文字不轉成假注音。 */
+                    nonZh: 'removed'
                 });
 
                 return pinyinArray
@@ -933,7 +1141,12 @@
              * 如果語音服務直接辨識出了正確寶可夢名稱，
              * 或句子裡包含正確名稱，直接視為 100。
              */
-            if (cleanText.includes(pokemon.name)) {
+            const normalizedTargetName = normalizeNameForComparison(pokemon.name);
+
+            if (
+                normalizedTargetName &&
+                cleanText.includes(normalizedTargetName)
+            ) {
                 return {
                     transcript,
                     cleanText,
@@ -972,7 +1185,7 @@
         }
 
         /* =========================================================
-         * SpeechRecognition Session - V3
+         * SpeechRecognition Session - V4
          * ========================================================= */
 
         function isCurrentSession(session) {
@@ -984,6 +1197,7 @@
 
             clearTimeout(session.preSpeechTimer);
             clearTimeout(session.recordingTimer);
+            clearTimeout(session.speechEndTimer);
             clearTimeout(session.audioStopWatchdogTimer);
             clearTimeout(session.resultWaitTimer);
             clearTimeout(session.endGraceTimer);
@@ -992,6 +1206,7 @@
 
             session.preSpeechTimer = null;
             session.recordingTimer = null;
+            session.speechEndTimer = null;
             session.audioStopWatchdogTimer = null;
             session.resultWaitTimer = null;
             session.endGraceTimer = null;
@@ -1130,6 +1345,7 @@
             session.stopRequested = true;
             clearTimeout(session.preSpeechTimer);
             clearTimeout(session.recordingTimer);
+            clearTimeout(session.speechEndTimer);
 
             if (updateMessage && !session.cancelled) {
                 setStatus('⏳ 錄音結束，語音分析中...');
@@ -1441,8 +1657,10 @@
                 cancelled: false,
                 finished: false,
                 bestInterim: null,
+                recordingLimitMs: getSpeechRecordingLimitMs(currentPokemon),
                 preSpeechTimer: null,
                 recordingTimer: null,
+                speechEndTimer: null,
                 audioStopWatchdogTimer: null,
                 resultWaitTimer: null,
                 endGraceTimer: null,
@@ -1453,7 +1671,7 @@
             recognition.lang = 'zh-TW';
 
             /*
-             * V3 開啟 interimResults。
+             * V4 延續 interimResults。
              * 這不會直接把暫存結果判成答案；只有 final 缺席時才作為救援。
              */
             recognition.interimResults = true;
@@ -1471,7 +1689,7 @@
 
                 /*
                  * V2 從這一刻就開始算 4 秒。
-                 * V3 改成这里只負責等待 speechstart，最多等待 7 秒。
+                 * V4 仍只負責等待 speechstart，最多等待 7 秒。
                  */
                 clearTimeout(session.preSpeechTimer);
                 session.preSpeechTimer = setTimeout(() => {
@@ -1492,22 +1710,30 @@
 
             recognition.onsoundstart = () => {
                 logLifecycle(session, 'soundstart');
+                /* 如果 Safari 又偵測到聲音，先取消「講完」倒數。 */
+                clearTimeout(session.speechEndTimer);
             };
 
             recognition.onspeechstart = () => {
                 session.speechStarted = true;
+                session.speechEnded = false;
                 logLifecycle(session, 'speechstart');
 
                 clearTimeout(session.preSpeechTimer);
+                clearTimeout(session.speechEndTimer);
 
                 /*
-                 * 真正聽到孩子開始說話後，才重新給完整 4 秒。
-                 * 這是 V3 最主要的時間修正。
+                 * 真正聽到孩子開始說話後才啟動上限，且依題目音節數調整。
+                 * speechend 若先發生，會用短暫靜音緩衝提早送出。
                  */
                 clearTimeout(session.recordingTimer);
                 session.recordingTimer = setTimeout(() => {
-                    requestStop(session, 'speechstart 後 4 秒上限', true);
-                }, SPEECH_RECORDING_MS);
+                    requestStop(
+                        session,
+                        `speechstart 後 ${session.recordingLimitMs}ms 上限`,
+                        true
+                    );
+                }, session.recordingLimitMs);
 
                 if (isCurrentSession(session) && !session.cancelled) {
                     setStatus('🎙️ 收到聲音了，請把答案說完');
@@ -1523,13 +1749,23 @@
                     !session.cancelled &&
                     !session.resultHandled
                 ) {
-                    setStatus('⏳ 已收到語音，正在分析...');
+                    setStatus('⏳ 好像說完了，正在準備辨識...');
                 }
 
                 /*
-                 * 不在 speechend 立刻 stop，避免 Safari 因短暫停頓過早切斷。
-                 * 仍由 speechstart 後的 4 秒上限或瀏覽器自然結束來收尾。
+                 * V4：講完後不用硬等到最大秒數。
+                 * 但保留 1.1 秒緩衝，避免孩子字與字之間稍微停頓就被切斷。
                  */
+                clearTimeout(session.speechEndTimer);
+                session.speechEndTimer = setTimeout(() => {
+                    if (
+                        !session.finished &&
+                        !session.resultHandled &&
+                        !session.cancelled
+                    ) {
+                        requestStop(session, 'speechend 靜音緩衝結束', true);
+                    }
+                }, SPEECH_END_GRACE_MS);
             };
 
             recognition.onsoundend = () => {
@@ -1543,6 +1779,7 @@
                 clearTimeout(session.audioStopWatchdogTimer);
                 clearTimeout(session.preSpeechTimer);
                 clearTimeout(session.recordingTimer);
+                clearTimeout(session.speechEndTimer);
 
                 /*
                  * 到這裡代表瀏覽器已停止擷取麥克風。
@@ -1633,6 +1870,7 @@
                 clearTimeout(session.resultWaitTimer);
                 clearTimeout(session.preSpeechTimer);
                 clearTimeout(session.recordingTimer);
+                clearTimeout(session.speechEndTimer);
 
                 if (!isCurrentSession(session)) {
                     clearSessionTimers(session);
@@ -1691,8 +1929,10 @@
             console.log('題目：', session.targetPokemon.name);
             console.log('標準注音：', getTargetZhuyin(session.targetPokemon).join(' / '));
             console.log('maxAlternatives：', MAX_ALTERNATIVES);
+            console.log('實際發音音節數：', getPronounceableSyllableCount(session.targetPokemon));
             console.log('等待開始說話：', `${WAIT_FOR_SPEECH_MS}ms`);
-            console.log('speechstart 後發音時間：', `${SPEECH_RECORDING_MS}ms`);
+            console.log('本題 speechstart 後最大時間：', `${session.recordingLimitMs}ms`);
+            console.log('speechend 靜音緩衝：', `${SPEECH_END_GRACE_MS}ms`);
             console.groupEnd();
 
             try {
