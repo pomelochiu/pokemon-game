@@ -2243,7 +2243,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄌㄨㄛˋ",
             "ㄑㄧˊ",
-            "ㄧㄚˇ"
+            "ㄧㄚˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/249.png"
     },
@@ -3465,7 +3465,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄌㄚ",
             "ㄉㄧˋ",
-            "ㄧㄚˇ",
+            "ㄧㄚˋ",
             "ㄙ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/380.png"
@@ -4410,7 +4410,7 @@ const pokemonDB = [
     {
         "name": "亞克諾姆",
         "zhuyin": [
-            "ㄧㄚˇ",
+            "ㄧㄚˋ",
             "ㄎㄜˋ",
             "ㄋㄨㄛˋ",
             "ㄇㄨˇ"
@@ -4433,7 +4433,7 @@ const pokemonDB = [
             "ㄆㄚˋ",
             "ㄌㄨˋ",
             "ㄑㄧˊ",
-            "ㄧㄚˇ"
+            "ㄧㄚˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/484.png"
     },
@@ -4475,7 +4475,7 @@ const pokemonDB = [
             "ㄌㄟˊ",
             "ㄙㄜˋ",
             "ㄌㄧˋ",
-            "ㄧㄚˇ"
+            "ㄧㄚˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/488.png"
     },
@@ -5242,7 +5242,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄙㄨㄛˇ",
             "ㄌㄨㄛˊ",
-            "ㄧㄚˇ"
+            "ㄧㄚˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/570.png"
     },
@@ -5251,7 +5251,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄙㄨㄛˇ",
             "ㄌㄨㄛˊ",
-            "ㄧㄚˇ",
+            "ㄧㄚˋ",
             "ㄎㄜˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/571.png"
@@ -5709,7 +5709,7 @@ const pokemonDB = [
         "name": "功夫鼬",
         "zhuyin": [
             "ㄍㄨㄥ",
-            "ㄈㄨ˙",
+            "ㄈㄨ",
             "ㄧㄡˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/619.png"
@@ -6254,7 +6254,7 @@ const pokemonDB = [
             "ㄉㄨㄛ",
             "ㄌㄧˋ",
             "ㄇㄧˇ",
-            "ㄧㄚˇ"
+            "ㄧㄚˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/676.png"
     },
@@ -6624,7 +6624,7 @@ const pokemonDB = [
             "ㄓㄜˊ",
             "ㄦˇ",
             "ㄋㄧˊ",
-            "ㄧㄚˇ",
+            "ㄧㄚˋ",
             "ㄙ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/716.png"
@@ -8229,7 +8229,7 @@ const pokemonDB = [
             "ㄌㄨㄥˊ",
             "ㄇㄟˊ",
             "ㄒㄧ",
-            "ㄧㄚˇ"
+            "ㄧㄚˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/885.png"
     },
@@ -9254,7 +9254,7 @@ const pokemonDB = [
         "name": "涼脊龍",
         "zhuyin": [
             "ㄌㄧㄤˊ",
-            "ㄐㄧˊ",
+            "ㄐㄧˇ",
             "ㄌㄨㄥˊ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/996.png"
@@ -9263,7 +9263,7 @@ const pokemonDB = [
         "name": "凍脊龍",
         "zhuyin": [
             "ㄉㄨㄥˋ",
-            "ㄐㄧˊ",
+            "ㄐㄧˇ",
             "ㄌㄨㄥˊ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/997.png"
@@ -9272,7 +9272,7 @@ const pokemonDB = [
         "name": "戟脊龍",
         "zhuyin": [
             "ㄐㄧˇ",
-            "ㄐㄧˊ",
+            "ㄐㄧˇ",
             "ㄌㄨㄥˊ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/998.png"
