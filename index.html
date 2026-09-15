@@ -426,6 +426,13 @@
         let isReadingMode = false;
         let pinyinFn = null;
 
+        /*
+         * 換題翻牌鎖：
+         * 當答案正面正在翻回背面時，暫時不接受新的換題／作答操作，
+         * 避免下一題圖片在翻牌動畫尚未完成前提前露出。
+         */
+        let isChangingQuestion = false;
+
         const SCORE_CORRECT = 90;
         const SCORE_CLOSE = 75;
 
@@ -725,15 +732,8 @@
             bopomofoText.classList.remove('hide-zhuyin');
         }
 
-        function loadRandomPokemon() {
-            if (typeof pokemonDB === 'undefined' || pokemonDB.length === 0) {
-                return;
-            }
-
-            cancelActiveRecognition('換題 / 切換模式', true);
-
-            card.classList.remove('flipped');
-            pokemonImage.removeAttribute('src');
+        function applyPokemonQuestion(nextPokemon) {
+            currentPokemon = nextPokemon;
 
             if (isReadingMode) {
                 bopomofoText.classList.add('hide-zhuyin');
@@ -743,19 +743,88 @@
                 setStatus('請拼出上面的注音');
             }
 
-            currentPokemon = drawNextPokemon();
-
             bopomofoText.innerHTML = generateZhuyinHTML(
                 currentPokemon.name,
                 currentPokemon.zhuyin
             );
 
-            /* 卡牌背面顯示期間就開始載入圖片，答對翻牌時較不容易白一下。 */
+            /*
+             * 只有在卡牌已經回到背面後才更換正面圖片。
+             * 這樣答案翻開時按「下一題」，不會在翻回去的途中閃出下一隻。
+             */
             pokemonImage.src = currentPokemon.image;
             pokemonImage.alt = currentPokemon.name;
 
-            /* 順便預載下一題的圖片。 */
+            /* 順便預載再下一題的圖片。 */
             preloadUpcomingImage();
+        }
+
+        function loadRandomPokemon() {
+            if (typeof pokemonDB === 'undefined' || pokemonDB.length === 0) {
+                return;
+            }
+
+            if (isChangingQuestion) {
+                return;
+            }
+
+            cancelActiveRecognition('換題 / 切換模式', true);
+
+            const nextPokemon = drawNextPokemon();
+            const wasFlipped = card.classList.contains('flipped');
+
+            /*
+             * 如果卡牌本來就在背面，直接換題即可。
+             */
+            if (!wasFlipped) {
+                card.classList.remove('flipped');
+                applyPokemonQuestion(nextPokemon);
+                return;
+            }
+
+            /*
+             * 如果目前答案是翻開的：
+             * 1. 保留「舊題」圖片
+             * 2. 先把卡牌完整翻回背面
+             * 3. transform 動畫結束後才換成下一題
+             *
+             * Safari 偶爾可能漏掉 transitionend，因此另外加 950ms fallback。
+             */
+            isChangingQuestion = true;
+
+            let finished = false;
+            let fallbackTimer = null;
+
+            const finishQuestionChange = () => {
+                if (finished) return;
+                finished = true;
+
+                if (fallbackTimer) {
+                    clearTimeout(fallbackTimer);
+                    fallbackTimer = null;
+                }
+
+                card.removeEventListener('transitionend', onCardTransitionEnd);
+
+                applyPokemonQuestion(nextPokemon);
+                isChangingQuestion = false;
+            };
+
+            const onCardTransitionEnd = (event) => {
+                if (event.target !== card || event.propertyName !== 'transform') {
+                    return;
+                }
+
+                finishQuestionChange();
+            };
+
+            card.addEventListener('transitionend', onCardTransitionEnd);
+            card.classList.remove('flipped');
+
+            fallbackTimer = setTimeout(
+                finishQuestionChange,
+                950
+            );
         }
 
         /* =========================================================
@@ -1950,6 +2019,8 @@
          * ========================================================= */
 
         modeBtn.addEventListener('click', () => {
+            if (isChangingQuestion) return;
+
             isReadingMode = !isReadingMode;
             modeBtn.textContent = isReadingMode
                 ? '切換為：拼音模式'
@@ -1958,11 +2029,13 @@
         });
 
         micBtn.addEventListener('click', () => {
+            if (isChangingQuestion) return;
+
             startRecognition();
         });
 
         showBtn.addEventListener('click', () => {
-            if (!currentPokemon) return;
+            if (isChangingQuestion || !currentPokemon) return;
 
             cancelActiveRecognition('查看答案', true);
             revealAnswer();
@@ -1970,6 +2043,8 @@
         });
 
         nextBtn.addEventListener('click', () => {
+            if (isChangingQuestion) return;
+
             loadRandomPokemon();
         });
 
