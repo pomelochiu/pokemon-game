@@ -3115,7 +3115,7 @@ const pokemonDB = [
         "name": "天秤偶",
         "zhuyin": [
             "ㄊㄧㄢ",
-            "ㄔㄥˋ",
+            "ㄆ一ㄥˊ",
             "ㄡˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/343.png"
