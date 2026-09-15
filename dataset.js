@@ -910,7 +910,7 @@ const pokemonDB = [
     {
         "name": "椰蛋樹",
         "zhuyin": [
-            "ㄧㄝ",
+            "ㄧㄝˊ",
             "ㄉㄢˋ",
             "ㄕㄨˋ"
         ],
@@ -4682,7 +4682,7 @@ const pokemonDB = [
         "name": "花椰猴",
         "zhuyin": [
             "ㄏㄨㄚ",
-            "ㄧㄝ",
+            "ㄧㄝˊ",
             "ㄏㄡˊ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/511.png"
@@ -4691,7 +4691,7 @@ const pokemonDB = [
         "name": "花椰猿",
         "zhuyin": [
             "ㄏㄨㄚ",
-            "ㄧㄝ",
+            "ㄧㄝˊ",
             "ㄩㄢˊ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/512.png"
