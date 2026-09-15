@@ -3685,7 +3685,7 @@ const pokemonDB = [
     {
         "name": "勒克貓",
         "zhuyin": [
-            "ㄌㄟ",
+            "ㄌㄜˋ",
             "ㄎㄜˋ",
             "ㄇㄠ"
         ],
@@ -8315,7 +8315,7 @@ const pokemonDB = [
             "ㄌㄟˊ",
             "ㄐㄧˊ",
             "ㄞˋ",
-            "ㄌㄟ",
+            "ㄌㄜˋ",
             "ㄑㄧˊ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/894.png"
@@ -9353,7 +9353,7 @@ const pokemonDB = [
         "name": "故勒頓",
         "zhuyin": [
             "ㄍㄨˋ",
-            "ㄌㄟ",
+            "ㄌㄜˋ",
             "ㄉㄨㄣˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1007.png"
@@ -9362,7 +9362,7 @@ const pokemonDB = [
         "name": "密勒頓",
         "zhuyin": [
             "ㄇㄧˋ",
-            "ㄌㄟ",
+            "ㄌㄜˋ",
             "ㄉㄨㄣˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1008.png"
