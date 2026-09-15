@@ -2243,7 +2243,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄌㄨㄛˋ",
             "ㄑㄧˊ",
-            "ㄧㄚˋ"
+            "ㄧㄚˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/249.png"
     },
@@ -3465,7 +3465,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄌㄚ",
             "ㄉㄧˋ",
-            "ㄧㄚˋ",
+            "ㄧㄚˇ",
             "ㄙ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/380.png"
@@ -4410,7 +4410,7 @@ const pokemonDB = [
     {
         "name": "亞克諾姆",
         "zhuyin": [
-            "ㄧㄚˋ",
+            "ㄧㄚˇ",
             "ㄎㄜˋ",
             "ㄋㄨㄛˋ",
             "ㄇㄨˇ"
@@ -4433,7 +4433,7 @@ const pokemonDB = [
             "ㄆㄚˋ",
             "ㄌㄨˋ",
             "ㄑㄧˊ",
-            "ㄧㄚˋ"
+            "ㄧㄚˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/484.png"
     },
@@ -4475,7 +4475,7 @@ const pokemonDB = [
             "ㄌㄟˊ",
             "ㄙㄜˋ",
             "ㄌㄧˋ",
-            "ㄧㄚˋ"
+            "ㄧㄚˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/488.png"
     },
@@ -5242,7 +5242,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄙㄨㄛˇ",
             "ㄌㄨㄛˊ",
-            "ㄧㄚˋ"
+            "ㄧㄚˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/570.png"
     },
@@ -5251,7 +5251,7 @@ const pokemonDB = [
         "zhuyin": [
             "ㄙㄨㄛˇ",
             "ㄌㄨㄛˊ",
-            "ㄧㄚˋ",
+            "ㄧㄚˇ",
             "ㄎㄜˋ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/571.png"
@@ -6254,7 +6254,7 @@ const pokemonDB = [
             "ㄉㄨㄛ",
             "ㄌㄧˋ",
             "ㄇㄧˇ",
-            "ㄧㄚˋ"
+            "ㄧㄚˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/676.png"
     },
@@ -6624,7 +6624,7 @@ const pokemonDB = [
             "ㄓㄜˊ",
             "ㄦˇ",
             "ㄋㄧˊ",
-            "ㄧㄚˋ",
+            "ㄧㄚˇ",
             "ㄙ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/716.png"
@@ -8229,7 +8229,7 @@ const pokemonDB = [
             "ㄌㄨㄥˊ",
             "ㄇㄟˊ",
             "ㄒㄧ",
-            "ㄧㄚˋ"
+            "ㄧㄚˇ"
         ],
         "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/885.png"
     },
