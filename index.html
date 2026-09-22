@@ -410,16 +410,17 @@
     <script src="dataset.js"></script>
     <script>
         /* =========================================================
-         * 寶可夢拼音 / 認字挑戰 V4
+         * 寶可夢拼音 / 認字挑戰 V13 - Speech Optimized
          *
-         * V4 重點：
-         * 1. 保留 V3 的 SpeechRecognition session / interim fallback 架構。
-         * 2. ：、・、．等「無聲符號」只顯示，不顯示假注音、不參與判分。
-         * 3. Ｑ、Ｚ、Ⅱ 等非注音字元保留官方名稱顯示，但不讓它們拉低注音相似度。
-         * 4. speechend 後給短暫靜音緩衝，孩子講完即可提早 stop，不必一直等滿上限。
-         * 5. 最長說話時間依實際發音音節數動態調整，四、五字名稱有更充裕時間。
-         * 6. 題庫啟動時自動健康檢查；隨機題目改為一輪不重複。
-         * 7. 寶可夢圖片提前載入；pinyin-pro 固定為 3.28.1。
+         * V13 重點：
+         * 1. 保留原本穩定的 SpeechRecognition session / watchdog 架構。
+         * 2. 修正換題翻牌期間按麥克風會被直接吃掉：改為排隊，換題完成後自動開始。
+         * 3. 將多段 SpeechRecognitionResult 組成完整 utterance，再做判分，避免只拿半句作答。
+         * 4. Final 不再無條件覆蓋較好的 Interim；只有「強 Interim + Final 也相當接近」才救援。
+         * 5. 保留 90 / 75 判分門檻，不全面放寬。
+         * 6. 加入非常保守的近音救援：至少 3 音節、只允許 1 個已知近音差異，其餘音節須完全一致。
+         * 7. ：、・、．等無聲符號與 Q/Z/Ⅱ 等特殊名稱字元維持原本安全處理。
+         * 8. 題庫健康檢查、隨機不重複、圖片預載與 Safari/iOS 保護全部保留。
          * ========================================================= */
 
         let currentPokemon = null;
@@ -433,8 +434,22 @@
          */
         let isChangingQuestion = false;
 
+        /*
+         * 使用者若在翻牌換題的 0.8~0.95 秒內按下麥克風，
+         * 不再把 click 丟掉，而是等新題真正套用後自動開始錄音。
+         */
+        let pendingMicStart = false;
+
         const SCORE_CORRECT = 90;
         const SCORE_CLOSE = 75;
+
+        /*
+         * Final / Interim 融合採保守規則：
+         * - Final 本身 >= 90：直接採 Final。
+         * - Final < 90 時，只有強 Interim >= 90 且 Final 仍至少「接近」才考慮救援。
+         * 這樣主要救回 ASR 最後一步改壞文字的情況，不全面放寬錯誤答案。
+         */
+        const INTERIM_RESCUE_MIN_FINAL_SCORE = 75;
 
         /* 等待孩子真正開始說話的最大時間。 */
         const WAIT_FOR_SPEECH_MS = 7000;
@@ -458,6 +473,12 @@
         const HARD_SESSION_LIMIT_MS = 22000;
         const ABORT_SETTLE_MS = 900;
         const MAX_ALTERNATIVES = 5;
+
+        /*
+         * 每一個 SpeechRecognitionResult 仍只向瀏覽器要求最多 5 個 alternatives，
+         * 但多段 result 組合後允許最多 15 個完整句候選進入真正的語音相似度評分。
+         */
+        const MAX_UTTERANCE_CANDIDATES = 15;
 
         /* 名稱中這些符號有視覺意義，但沒有發音。 */
         const SILENT_NAME_SYMBOLS = new Set([
@@ -627,7 +648,7 @@
             }
 
             if (specialTokens.length) {
-                console.log('特殊字元（V4 會安全處理）：');
+                console.log('特殊字元（V13 會安全處理）：');
                 specialTokens.forEach(item => console.log(item));
             }
             console.groupEnd();
@@ -808,6 +829,19 @@
 
                 applyPokemonQuestion(nextPokemon);
                 isChangingQuestion = false;
+
+                /*
+                 * 使用者在翻牌期間按過麥克風：現在題目已安全切換完成，
+                 * 自動執行那次錄音要求。
+                 */
+                if (pendingMicStart) {
+                    pendingMicStart = false;
+                    setTimeout(() => {
+                        if (!isChangingQuestion) {
+                            startRecognition();
+                        }
+                    }, 0);
+                }
             };
 
             const onCardTransitionEnd = (event) => {
@@ -1119,6 +1153,103 @@
             return Math.max(0, (1 - distance / maxLength) * 100);
         }
 
+        /*
+         * 注音音節拆解：
+         * 聲母只有第一個符號；其餘視為韻母/介音組合。
+         * 這裡不處理聲調，因為 normalizeZhuyinSyllable() 已經移除聲調。
+         */
+        const ZHUYIN_INITIALS = new Set([
+            'ㄅ', 'ㄆ', 'ㄇ', 'ㄈ',
+            'ㄉ', 'ㄊ', 'ㄋ', 'ㄌ',
+            'ㄍ', 'ㄎ', 'ㄏ',
+            'ㄐ', 'ㄑ', 'ㄒ',
+            'ㄓ', 'ㄔ', 'ㄕ', 'ㄖ',
+            'ㄗ', 'ㄘ', 'ㄙ'
+        ]);
+
+        /*
+         * 只列「語音辨識服務很常互相轉寫」的近音。
+         * 這不是把它們當作完全相同；只有在長名稱且只錯這一個音節時才可能救援。
+         */
+        const CLOSE_INITIAL_GROUPS = [
+            new Set(['ㄓ', 'ㄗ']),
+            new Set(['ㄔ', 'ㄘ']),
+            new Set(['ㄕ', 'ㄙ']),
+            new Set(['ㄋ', 'ㄌ']),
+            new Set(['ㄌ', 'ㄖ']),
+            new Set(['ㄐ', 'ㄑ']),
+            new Set(['ㄑ', 'ㄒ'])
+        ];
+
+        const CLOSE_FINAL_GROUPS = [
+            new Set(['ㄣ', 'ㄥ']),
+            new Set(['ㄢ', 'ㄤ']),
+            new Set(['ㄧㄣ', 'ㄧㄥ'])
+        ];
+
+        function splitZhuyinSyllable(value) {
+            const syllable = normalizeZhuyinSyllable(value);
+            if (!syllable) {
+                return { initial: '', final: '' };
+            }
+
+            const first = syllable[0];
+            if (ZHUYIN_INITIALS.has(first)) {
+                return {
+                    initial: first,
+                    final: syllable.slice(1)
+                };
+            }
+
+            return {
+                initial: '',
+                final: syllable
+            };
+        }
+
+        function inSameCloseGroup(a, b, groups) {
+            if (!a || !b || a === b) return false;
+
+            return groups.some(group => group.has(a) && group.has(b));
+        }
+
+        function isConservativeCloseSyllable(a, b) {
+            a = normalizeZhuyinSyllable(a);
+            b = normalizeZhuyinSyllable(b);
+
+            if (!a || !b || a === b) {
+                return false;
+            }
+
+            const left = splitZhuyinSyllable(a);
+            const right = splitZhuyinSyllable(b);
+
+            /*
+             * Case A：韻母完全相同，只差一組常見近音聲母。
+             * 例：ㄑㄧㄡ / ㄐㄧㄡ
+             */
+            if (
+                left.final &&
+                left.final === right.final &&
+                inSameCloseGroup(left.initial, right.initial, CLOSE_INITIAL_GROUPS)
+            ) {
+                return true;
+            }
+
+            /*
+             * Case B：聲母完全相同，只差一組常見近音韻母。
+             * 例：ㄌㄧㄣ / ㄌㄧㄥ（是否救援仍要通過整題的嚴格條件）
+             */
+            if (
+                left.initial === right.initial &&
+                inSameCloseGroup(left.final, right.final, CLOSE_FINAL_GROUPS)
+            ) {
+                return true;
+            }
+
+            return false;
+        }
+
         function zhuyinSequenceScore(spokenZhuyin, targetZhuyin) {
             if (!spokenZhuyin.length || !targetZhuyin.length) {
                 return 0;
@@ -1141,13 +1272,71 @@
             const syllableScore = syllableTotal / maxCount;
 
             /*
-             * 70% 看每一字的注音，30% 看整體發音。
-             * 維持 V1 的核心邏輯，但標準答案改成 dataset zhuyin。
+             * 仍維持既有 70% 每音節 + 30% 整體的核心分數。
+             * 近音救援不直接混進這個分數，避免整體判分全面變鬆。
              */
             return Math.round(
                 syllableScore * 0.7 +
                 wholeStringScore * 0.3
             );
+        }
+
+        function analyzeConservativePhoneticRescue(bestWindow, targetZhuyin) {
+            const targetLength = targetZhuyin.length;
+
+            /*
+             * 兩音節名稱錯一個音就等於錯一半，因此完全不使用近音救援。
+             * 至少三音節才有資格。
+             */
+            if (
+                targetLength < 3 ||
+                bestWindow.length !== targetLength
+            ) {
+                return {
+                    eligible: false,
+                    exactCount: 0,
+                    closeCount: 0,
+                    mismatchCount: Math.max(bestWindow.length, targetLength)
+                };
+            }
+
+            let exactCount = 0;
+            let closeCount = 0;
+            let mismatchCount = 0;
+
+            for (let i = 0; i < targetLength; i++) {
+                const spoken = normalizeZhuyinSyllable(bestWindow[i]);
+                const target = normalizeZhuyinSyllable(targetZhuyin[i]);
+
+                if (spoken === target) {
+                    exactCount++;
+                    continue;
+                }
+
+                mismatchCount++;
+
+                if (isConservativeCloseSyllable(spoken, target)) {
+                    closeCount++;
+                }
+            }
+
+            /*
+             * 最嚴格條件：
+             * - 只有 1 個音節不同
+             * - 那 1 個必須是已知近音
+             * - 其他所有音節完全一致
+             */
+            const eligible =
+                mismatchCount === 1 &&
+                closeCount === 1 &&
+                exactCount === targetLength - 1;
+
+            return {
+                eligible,
+                exactCount,
+                closeCount,
+                mismatchCount
+            };
         }
 
         function getBestZhuyinScore(spokenZhuyin, targetZhuyin) {
@@ -1163,7 +1352,7 @@
             let bestWindow = spokenZhuyin;
 
             /*
-             * 容許孩子說「答案是皮卡丘」、「我猜皮卡丘」等句型。
+             * 容許使用者說「答案是皮卡丘」、「我猜皮卡丘」等句型。
              * 如果辨識句子比較長，就找其中最像答案的一段。
              */
             if (spokenZhuyin.length >= targetLength) {
@@ -1199,10 +1388,14 @@
                     transcript,
                     cleanText,
                     score: 0,
+                    rawScore: 0,
                     spokenZhuyin: [],
                     targetZhuyin,
                     bestWindow: [],
-                    exactTextMatch: false
+                    exactTextMatch: false,
+                    exactZhuyinMatch: false,
+                    phoneticRescue: false,
+                    matchType: 'empty'
                 };
             }
 
@@ -1220,10 +1413,14 @@
                     transcript,
                     cleanText,
                     score: 100,
+                    rawScore: 100,
                     spokenZhuyin: recognizedTextToZhuyin(cleanText),
                     targetZhuyin,
                     bestWindow: targetZhuyin,
-                    exactTextMatch: true
+                    exactTextMatch: true,
+                    exactZhuyinMatch: true,
+                    phoneticRescue: false,
+                    matchType: 'exact-text'
                 };
             }
 
@@ -1232,29 +1429,77 @@
                     transcript,
                     cleanText,
                     score: 0,
+                    rawScore: 0,
                     spokenZhuyin: [],
                     targetZhuyin,
                     bestWindow: [],
-                    exactTextMatch: false
+                    exactTextMatch: false,
+                    exactZhuyinMatch: false,
+                    phoneticRescue: false,
+                    matchType: 'pinyin-unavailable'
                 };
             }
 
             const spokenZhuyin = recognizedTextToZhuyin(cleanText);
             const result = getBestZhuyinScore(spokenZhuyin, targetZhuyin);
 
+            const exactZhuyinMatch =
+                result.bestWindow.length === targetZhuyin.length &&
+                targetZhuyin.length > 0 &&
+                result.bestWindow.every(
+                    (value, index) =>
+                        normalizeZhuyinSyllable(value) ===
+                        normalizeZhuyinSyllable(targetZhuyin[index])
+                );
+
+            if (exactZhuyinMatch) {
+                return {
+                    transcript,
+                    cleanText,
+                    score: 100,
+                    rawScore: result.score,
+                    spokenZhuyin,
+                    targetZhuyin,
+                    bestWindow: result.bestWindow,
+                    exactTextMatch: false,
+                    exactZhuyinMatch: true,
+                    phoneticRescue: false,
+                    matchType: 'exact-zhuyin'
+                };
+            }
+
+            const rescue = analyzeConservativePhoneticRescue(
+                result.bestWindow,
+                targetZhuyin
+            );
+
+            /*
+             * 近音救援固定只拉到 91：
+             * 足以跨過 90 的正確門檻，但不偽裝成 100 分。
+             * 且只有非常嚴格的「長名稱只差一個已知近音」才會觸發。
+             */
+            const finalScore = rescue.eligible
+                ? Math.max(result.score, 91)
+                : result.score;
+
             return {
                 transcript,
                 cleanText,
-                score: result.score,
+                score: finalScore,
+                rawScore: result.score,
                 spokenZhuyin,
                 targetZhuyin,
                 bestWindow: result.bestWindow,
-                exactTextMatch: false
+                exactTextMatch: false,
+                exactZhuyinMatch: false,
+                phoneticRescue: rescue.eligible,
+                phoneticDetails: rescue,
+                matchType: rescue.eligible ? 'phonetic-rescue' : 'similarity'
             };
         }
 
         /* =========================================================
-         * SpeechRecognition Session - V4
+         * SpeechRecognition Session - V13
          * ========================================================= */
 
         function isCurrentSession(session) {
@@ -1306,7 +1551,7 @@
             logLifecycle(
                 session,
                 'SESSION FINISH',
-                `speechStart=${session.speechStarted} audioEnd=${session.audioEnded} end=${session.serviceEnded} final=${session.finalResultHandled} interim=${Boolean(session.bestInterim)} stop=${session.stopRequested} abort=${session.abortRequested}`
+                `speechStart=${session.speechStarted} audioEnd=${session.audioEnded} end=${session.serviceEnded} final=${session.finalResultHandled} interim=${Boolean(session.bestInterim)} source=${session.resultSource || '-'} stop=${session.stopRequested} abort=${session.abortRequested}`
             );
 
             if (
@@ -1456,27 +1701,44 @@
             }
         }
 
+        /*
+         * 將 event.results 的多個片段組成「完整一句」候選。
+         *
+         * 舊版是把每個 SpeechRecognitionResult 各自當成完整答案；
+         * 如果 Safari/Chrome 把「皮卡丘」拆成兩段，就可能只拿「皮卡」先判分。
+         *
+         * V13 使用小型 beam 組合，每段最多拿 MAX_ALTERNATIVES 個候選，
+         * 最終讓最多 MAX_UTTERANCE_CANDIDATES 個完整 utterance 進入判分。
+         */
         function collectResultAlternatives(event) {
-            const finalAlternatives = [];
-            const interimAlternatives = [];
-            const finalSeen = new Set();
-            const interimSeen = new Set();
-
-            if (!event || !event.results) {
-                return { finalAlternatives, interimAlternatives };
+            if (!event || !event.results || !event.results.length) {
+                return {
+                    finalAlternatives: [],
+                    interimAlternatives: []
+                };
             }
+
+            let beams = [{
+                transcript: '',
+                confidenceTotal: 0,
+                confidenceCount: 0,
+                rankPenalty: 0
+            }];
+
+            let hasUsableResult = false;
+            let allFinal = true;
 
             for (let resultIndex = 0; resultIndex < event.results.length; resultIndex++) {
                 const result = event.results[resultIndex];
-                if (!result) continue;
+                if (!result || !result.length) continue;
 
-                const destination = result.isFinal
-                    ? finalAlternatives
-                    : interimAlternatives;
+                hasUsableResult = true;
 
-                const seen = result.isFinal
-                    ? finalSeen
-                    : interimSeen;
+                if (!result.isFinal) {
+                    allFinal = false;
+                }
+
+                const segmentAlternatives = [];
 
                 for (let i = 0; i < result.length && i < MAX_ALTERNATIVES; i++) {
                     const alternative = result[i];
@@ -1484,25 +1746,105 @@
                         ? alternative.transcript.trim()
                         : '';
 
-                    if (!transcript || seen.has(transcript)) {
-                        continue;
-                    }
+                    if (!transcript) continue;
 
-                    seen.add(transcript);
-                    destination.push({
+                    segmentAlternatives.push({
                         transcript,
                         confidence:
                             typeof alternative.confidence === 'number'
                                 ? alternative.confidence
-                                : null
+                                : null,
+                        rank: i
                     });
+                }
+
+                if (!segmentAlternatives.length) {
+                    continue;
+                }
+
+                const nextBeams = [];
+
+                for (const beam of beams) {
+                    for (const alternative of segmentAlternatives) {
+                        const confidenceIsNumber =
+                            typeof alternative.confidence === 'number';
+
+                        nextBeams.push({
+                            transcript: `${beam.transcript} ${alternative.transcript}`.trim(),
+                            confidenceTotal:
+                                beam.confidenceTotal +
+                                (confidenceIsNumber ? alternative.confidence : 0),
+                            confidenceCount:
+                                beam.confidenceCount +
+                                (confidenceIsNumber ? 1 : 0),
+                            rankPenalty:
+                                beam.rankPenalty + alternative.rank
+                        });
+                    }
+                }
+
+                /*
+                 * 先保留原始順位較好的組合，再用 confidence 輔助。
+                 * 真正的語音相似度會在 evaluateAlternatives() 再排序。
+                 */
+                nextBeams.sort((a, b) => {
+                    if (a.rankPenalty !== b.rankPenalty) {
+                        return a.rankPenalty - b.rankPenalty;
+                    }
+
+                    const aConfidence = a.confidenceCount
+                        ? a.confidenceTotal / a.confidenceCount
+                        : 0;
+                    const bConfidence = b.confidenceCount
+                        ? b.confidenceTotal / b.confidenceCount
+                        : 0;
+
+                    return bConfidence - aConfidence;
+                });
+
+                beams = nextBeams.slice(0, MAX_UTTERANCE_CANDIDATES);
+            }
+
+            if (!hasUsableResult) {
+                return {
+                    finalAlternatives: [],
+                    interimAlternatives: []
+                };
+            }
+
+            const seen = new Set();
+            const alternatives = [];
+
+            for (const beam of beams) {
+                const transcript = beam.transcript.trim();
+                if (!transcript || seen.has(transcript)) {
+                    continue;
+                }
+
+                seen.add(transcript);
+
+                alternatives.push({
+                    transcript,
+                    confidence:
+                        beam.confidenceCount
+                            ? beam.confidenceTotal / beam.confidenceCount
+                            : null
+                });
+
+                if (alternatives.length >= MAX_UTTERANCE_CANDIDATES) {
+                    break;
                 }
             }
 
-            return {
-                finalAlternatives: finalAlternatives.slice(0, MAX_ALTERNATIVES),
-                interimAlternatives: interimAlternatives.slice(0, MAX_ALTERNATIVES)
-            };
+            return allFinal
+                ? {
+                    finalAlternatives: alternatives,
+                    interimAlternatives: []
+                }
+                : {
+                    finalAlternatives: [],
+                    interimAlternatives: alternatives
+                };
         }
 
         function evaluateAlternatives(alternatives, pokemon) {
@@ -1540,8 +1882,12 @@
                             : Math.round(item.confidence * 1000) / 1000,
                     辨識注音: item.spokenZhuyin.join(' / '),
                     最佳區段: item.bestWindow.join(' / '),
-                    相似度: `${item.score}%`,
-                    文字直接命中: item.exactTextMatch ? 'YES' : ''
+                    原始分數: `${item.rawScore ?? item.score}%`,
+                    最終分數: `${item.score}%`,
+                    判定類型: item.matchType || '',
+                    文字直接命中: item.exactTextMatch ? 'YES' : '',
+                    注音完全命中: item.exactZhuyinMatch ? 'YES' : '',
+                    近音救援: item.phoneticRescue ? 'YES' : ''
                 }))
             );
             console.log('最佳候選：', evaluations[0]);
@@ -1565,6 +1911,7 @@
             session.resultHandled = true;
             session.userMessageHandled = true;
             session.finalResultHandled = sourceLabel === 'FINAL';
+            session.resultSource = sourceLabel;
 
             logEvaluations(session, pokemon, evaluations, sourceLabel);
 
@@ -1646,6 +1993,91 @@
             );
         }
 
+        function chooseFinalOrInterimEvidence(session, finalEvaluations) {
+            const finalBest = finalEvaluations && finalEvaluations[0];
+            const interimEvaluations =
+                session.bestInterim &&
+                session.bestInterim.evaluations &&
+                session.bestInterim.evaluations.length
+                    ? session.bestInterim.evaluations
+                    : null;
+
+            const interimBest = interimEvaluations && interimEvaluations[0];
+
+            if (!finalBest) {
+                return {
+                    evaluations: interimEvaluations || [],
+                    sourceLabel: 'INTERIM FALLBACK'
+                };
+            }
+
+            /*
+             * Final 自己已經過 90，直接相信 Final。
+             * 不需要因 interim 更高就改來源，避免過度使用暫存結果。
+             */
+            if (finalBest.score >= SCORE_CORRECT) {
+                return {
+                    evaluations: finalEvaluations,
+                    sourceLabel: 'FINAL'
+                };
+            }
+
+            if (!interimBest || interimBest.score < SCORE_CORRECT) {
+                return {
+                    evaluations: finalEvaluations,
+                    sourceLabel: 'FINAL'
+                };
+            }
+
+            /*
+             * 強 Interim 救援條件：
+             * 1. Interim 本身已經 >= 90。
+             * 2. Final 至少還有 75，表示兩者並非完全不同的一句話。
+             * 3. Interim 必須是非常強的證據：
+             *    - 文字直接命中
+             *    - 注音完全命中
+             *    - 或保守近音救援
+             *
+             * 這是為了救回「interim 很準，但 final 最後改錯一個字」，
+             * 同時避免一閃而過的 hallucinated interim 造成誤判成功。
+             */
+            const interimIsStrongEvidence =
+                interimBest.exactTextMatch ||
+                interimBest.exactZhuyinMatch ||
+                interimBest.phoneticRescue;
+
+            if (
+                interimIsStrongEvidence &&
+                finalBest.score >= INTERIM_RESCUE_MIN_FINAL_SCORE
+            ) {
+                console.info(
+                    `[Speech #${session.id}] 使用強 Interim 救援 Final：`,
+                    {
+                        final: {
+                            transcript: finalBest.transcript,
+                            score: finalBest.score,
+                            matchType: finalBest.matchType
+                        },
+                        interim: {
+                            transcript: interimBest.transcript,
+                            score: interimBest.score,
+                            matchType: interimBest.matchType
+                        }
+                    }
+                );
+
+                return {
+                    evaluations: interimEvaluations,
+                    sourceLabel: 'INTERIM RESCUE'
+                };
+            }
+
+            return {
+                evaluations: finalEvaluations,
+                sourceLabel: 'FINAL'
+            };
+        }
+
         function processRecognitionResult(session, event) {
             if (
                 !isCurrentSession(session) ||
@@ -1661,20 +2093,36 @@
                 interimAlternatives
             } = collectResultAlternatives(event);
 
+            if (interimAlternatives.length) {
+                rememberInterimResult(session, interimAlternatives);
+                return;
+            }
+
             if (finalAlternatives.length) {
-                const evaluations = evaluateAlternatives(
+                const finalEvaluations = evaluateAlternatives(
                     finalAlternatives,
                     session.targetPokemon
                 );
 
-                if (applyEvaluations(session, evaluations, 'FINAL')) {
-                    requestStop(session, 'final result received', false);
-                }
-                return;
-            }
+                const selected = chooseFinalOrInterimEvidence(
+                    session,
+                    finalEvaluations
+                );
 
-            if (interimAlternatives.length) {
-                rememberInterimResult(session, interimAlternatives);
+                if (
+                    selected.evaluations.length &&
+                    applyEvaluations(
+                        session,
+                        selected.evaluations,
+                        selected.sourceLabel
+                    )
+                ) {
+                    requestStop(
+                        session,
+                        `${selected.sourceLabel} result received`,
+                        false
+                    );
+                }
             }
         }
 
@@ -1726,6 +2174,7 @@
                 cancelled: false,
                 finished: false,
                 bestInterim: null,
+                resultSource: '',
                 recordingLimitMs: getSpeechRecordingLimitMs(currentPokemon),
                 preSpeechTimer: null,
                 recordingTimer: null,
@@ -1740,7 +2189,7 @@
             recognition.lang = 'zh-TW';
 
             /*
-             * V4 延續 interimResults。
+             * V13 延續 interimResults。
              * 這不會直接把暫存結果判成答案；只有 final 缺席時才作為救援。
              */
             recognition.interimResults = true;
@@ -1758,7 +2207,7 @@
 
                 /*
                  * V2 從這一刻就開始算 4 秒。
-                 * V4 仍只負責等待 speechstart，最多等待 7 秒。
+                 * V13 仍只負責等待 speechstart，最多等待 7 秒。
                  */
                 clearTimeout(session.preSpeechTimer);
                 session.preSpeechTimer = setTimeout(() => {
@@ -1822,7 +2271,7 @@
                 }
 
                 /*
-                 * V4：講完後不用硬等到最大秒數。
+                 * V13：講完後不用硬等到最大秒數。
                  * 但保留 1.1 秒緩衝，避免孩子字與字之間稍微停頓就被切斷。
                  */
                 clearTimeout(session.speechEndTimer);
@@ -2021,6 +2470,7 @@
         modeBtn.addEventListener('click', () => {
             if (isChangingQuestion) return;
 
+            pendingMicStart = false;
             isReadingMode = !isReadingMode;
             modeBtn.textContent = isReadingMode
                 ? '切換為：拼音模式'
@@ -2029,7 +2479,11 @@
         });
 
         micBtn.addEventListener('click', () => {
-            if (isChangingQuestion) return;
+            if (isChangingQuestion) {
+                pendingMicStart = true;
+                setStatus('⏳ 正在換題，完成後會自動開啟麥克風...');
+                return;
+            }
 
             startRecognition();
         });
@@ -2037,6 +2491,7 @@
         showBtn.addEventListener('click', () => {
             if (isChangingQuestion || !currentPokemon) return;
 
+            pendingMicStart = false;
             cancelActiveRecognition('查看答案', true);
             revealAnswer();
             setStatus(`答案是：${currentPokemon.name}`);
@@ -2045,6 +2500,7 @@
         nextBtn.addEventListener('click', () => {
             if (isChangingQuestion) return;
 
+            pendingMicStart = false;
             loadRandomPokemon();
         });
 
