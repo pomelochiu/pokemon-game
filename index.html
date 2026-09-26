@@ -6,11 +6,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>寶可夢拼音/認字挑戰</title>
-    <script
-        src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.min.js"
-        integrity="sha512-MvP/4MeY8BO3JanwrBm/qUF4gDi/oaZlVG4rKQU/sGOg8STU20puDMlCqF0G+CeXVGWZJ3MI8tv+q1+8QoiDdg=="
-        crossorigin="anonymous"></script>
-
     <style>
         * {
             box-sizing: border-box;
@@ -378,6 +373,81 @@
             }
             .controls { gap: 9px; }
         }
+
+
+        /* =========================================================
+         * V16 語音診斷面板
+         * ========================================================= */
+        .diagnostic-panel {
+            width: 100%;
+            margin-top: 18px;
+            background: #ffffff;
+            border: 1px solid #d8d8d8;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 7px rgba(0,0,0,0.08);
+        }
+
+        .diagnostic-panel summary {
+            cursor: pointer;
+            padding: 12px 14px;
+            font-weight: 800;
+            font-size: 16px;
+            color: #333;
+            user-select: none;
+        }
+
+        .diagnostic-body {
+            border-top: 1px solid #e6e6e6;
+            padding: 12px;
+        }
+
+        #diagnosticSummary {
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.55;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            background: #f7f7f7;
+            white-space: pre-wrap;
+        }
+
+        .diagnostic-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        button.diag-btn {
+            border: 1px solid #bbb;
+            border-radius: 8px;
+            background: #fafafa;
+            color: #333;
+            padding: 8px 11px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        #diagnosticOutput {
+            margin: 0;
+            max-height: 420px;
+            overflow: auto;
+            background: #111;
+            color: #f0f0f0;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            text-align: left;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
     </style>
 </head>
 <body>
@@ -405,27 +475,51 @@
             <button id="showBtn" class="action-btn outline" type="button">看答案</button>
             <button id="nextBtn" class="action-btn secondary" type="button">下一題</button>
         </div>
+
+        <details id="diagnosticPanel" class="diagnostic-panel" open>
+            <summary>🧪 V16 語音診斷紀錄</summary>
+            <div class="diagnostic-body">
+                <div id="diagnosticSummary">尚未有語音測試紀錄。</div>
+                <div class="diagnostic-toolbar">
+                    <button id="copyLatestDiagBtn" class="diag-btn" type="button">複製最新紀錄</button>
+                    <button id="copyAllDiagBtn" class="diag-btn" type="button">複製全部紀錄</button>
+                    <button id="clearDiagBtn" class="diag-btn" type="button">清除紀錄</button>
+                </div>
+                <pre id="diagnosticOutput">按下麥克風測試後，這裡會顯示完整辨識流程。</pre>
+            </div>
+        </details>
+
     </main>
 
     <script src="dataset.js"></script>
     <script>
         /* =========================================================
-         * 寶可夢拼音 / 認字挑戰 V13 - Speech Optimized
+         * 寶可夢拼音 / 認字挑戰 V14 - Speech Diagnostic
          *
-         * V13 重點：
-         * 1. 保留原本穩定的 SpeechRecognition session / watchdog 架構。
-         * 2. 修正換題翻牌期間按麥克風會被直接吃掉：改為排隊，換題完成後自動開始。
-         * 3. 將多段 SpeechRecognitionResult 組成完整 utterance，再做判分，避免只拿半句作答。
-         * 4. Final 不再無條件覆蓋較好的 Interim；只有「強 Interim + Final 也相當接近」才救援。
-         * 5. 保留 90 / 75 判分門檻，不全面放寬。
-         * 6. 加入非常保守的近音救援：至少 3 音節、只允許 1 個已知近音差異，其餘音節須完全一致。
-         * 7. ：、・、．等無聲符號與 Q/Z/Ⅱ 等特殊名稱字元維持原本安全處理。
-         * 8. 題庫健康檢查、隨機不重複、圖片預載與 Safari/iOS 保護全部保留。
+         * 這一版的第一目標不是「繼續猜哪個分數要調」，而是把整個語音流程留下證據。
+         *
+         * V14 重點：
+         * 1. continuous = true，讓慢速／分段發音不會只因第一個 speechend 就結案。
+         * 2. speechend 後保留更長靜音窗；若又出現 speechstart / soundstart 會取消停止倒數。
+         * 3. 不再收到第一個 final 就立刻判題；整個 session 的 interim / final / alternatives 全部收集。
+         * 4. session 結束後才從完整 candidate pool 做最後判斷。
+         * 5. 每一次 Web Speech event、raw transcript、confidence、注音、分數、來源與停止原因全部記錄。
+         * 6. 畫面提供「複製最新紀錄 / 複製全部紀錄」，方便直接貼回來分析。
+         * 7. 最近 30 次 session 存在瀏覽器 localStorage，重新整理頁面仍可查看。
+         * 8. 保留 V13 的翻牌修正、90/75 門檻與保守近音救援。
          * ========================================================= */
 
         let currentPokemon = null;
         let isReadingMode = false;
         let pinyinFn = null;
+
+        /*
+         * V16：pinyin-pro 是同音字 / 近音字判分的必要元件。
+         * V14 診斷證實：若它未載入，除了 exact text 之外，
+         * 所有候選都會落到 pinyin-unavailable => 0 分。
+         */
+        let pinyinLoadSource = 'NOT_LOADED';
+        let pinyinLoadAttempts = [];
 
         /*
          * 換題翻牌鎖：
@@ -455,22 +549,34 @@
         const WAIT_FOR_SPEECH_MS = 7000;
 
         /*
-         * speechend 後不立即 stop：
-         * 給孩子約 1.1 秒的短暫停頓空間，避免字與字之間停頓被誤切斷。
+         * V16：speechend 靜音窗縮短。
+         * 真正提升準確率的是 pinyin-pro / 候選池，而不是固定長時間等待。
          */
-        const SPEECH_END_GRACE_MS = 1100;
+        const SPEECH_END_GRACE_MS = 1500;
 
         /* stop() 後，若 Safari 連 audioend/end 都沒有，再執行 abort。 */
-        const AUDIO_STOP_WATCHDOG_MS = 3500;
+        const AUDIO_STOP_WATCHDOG_MS = 2500;
 
-        /* audioend 已收到後，麥克風已停止擷取，可放心等待 final result。 */
-        const RESULT_WAIT_AFTER_AUDIO_MS = 5000;
+        /*
+         * audioend 後只保留較短 final 結果等待窗。
+         * 一般情況 onend 會更早到，這裡主要當 Safari fallback。
+         */
+        const RESULT_WAIT_AFTER_AUDIO_MS = 1600;
 
-        /* Safari 偶爾 end 與 result 時序異常，end 後再留一點緩衝。 */
-        const END_RESULT_GRACE_MS = 1200;
+        /* onend 後只留短暫 settle，讓最後一個 result 有機會進來。 */
+        const END_RESULT_GRACE_MS = 400;
+
+        /*
+         * V16 Fast Decision：
+         * - Final exact text / exact zhuyin：立即成功。
+         * - Final >= 90：短暫 250ms 穩定確認後成功。
+         * - 已有完整 Final 但分數不足：再聽 900ms，若沒有新結果就結束。
+         */
+        const FAST_FINAL_CONFIRM_MS = 250;
+        const FINAL_BELOW_THRESHOLD_SETTLE_MS = 900;
 
         /* 整個 session 的最終保險。動態錄音上限提高後，總上限也略放寬。 */
-        const HARD_SESSION_LIMIT_MS = 22000;
+        const HARD_SESSION_LIMIT_MS = 26000;
         const ABORT_SETTLE_MS = 900;
         const MAX_ALTERNATIVES = 5;
 
@@ -497,6 +603,12 @@
         const showBtn = document.getElementById('showBtn');
         const nextBtn = document.getElementById('nextBtn');
         const modeBtn = document.getElementById('modeBtn');
+        const diagnosticPanel = document.getElementById('diagnosticPanel');
+        const diagnosticSummary = document.getElementById('diagnosticSummary');
+        const diagnosticOutput = document.getElementById('diagnosticOutput');
+        const copyLatestDiagBtn = document.getElementById('copyLatestDiagBtn');
+        const copyAllDiagBtn = document.getElementById('copyAllDiagBtn');
+        const clearDiagBtn = document.getElementById('clearDiagBtn');
 
         const SpeechRecognition =
             window.SpeechRecognition ||
@@ -546,10 +658,14 @@
         function getSpeechRecordingLimitMs(pokemon) {
             const count = getPronounceableSyllableCount(pokemon);
 
-            if (count <= 2) return 3500;
-            if (count === 3) return 4200;
-            if (count === 4) return 5000;
-            return 5800;
+            /*
+             * V16：這些只剩「最長安全上限」。
+             * 正常情況應由 Fast Decision 在更早時間結束。
+             */
+            if (count <= 2) return 5000;
+            if (count === 3) return 6000;
+            if (count === 4) return 7000;
+            return 8000;
         }
 
         function shuffleArray(array) {
@@ -648,31 +764,277 @@
             }
 
             if (specialTokens.length) {
-                console.log('特殊字元（V13 會安全處理）：');
+                console.log('特殊字元（V15 會安全處理）：');
                 specialTokens.forEach(item => console.log(item));
             }
             console.groupEnd();
         }
 
-        window.addEventListener('load', () => {
-            if (window.pinyinPro && window.pinyinPro.pinyin) {
+
+        /* =========================================================
+         * V15 pinyin-pro resilient loader
+         * ========================================================= */
+
+        function registerPinyinFromGlobal(sourceLabel) {
+            if (
+                window.pinyinPro &&
+                typeof window.pinyinPro.pinyin === 'function'
+            ) {
                 pinyinFn = window.pinyinPro.pinyin;
-            } else {
-                console.warn('pinyin-pro 載入失敗，將只能使用中文字備用比對。');
+                pinyinLoadSource = sourceLabel;
+                return true;
             }
+            return false;
+        }
+
+        function recordPinyinLoadAttempt(source, status, extra = '') {
+            const item = {
+                source,
+                status,
+                extra: String(extra || ''),
+                time: new Date().toISOString()
+            };
+            pinyinLoadAttempts.push(item);
+            console.log('[pinyin-pro loader]', item);
+        }
+
+        function loadPinyinClassicScript(url, sourceLabel, timeoutMs = 6000) {
+            return new Promise((resolve, reject) => {
+                if (registerPinyinFromGlobal('already-present')) {
+                    resolve(true);
+                    return;
+                }
+
+                const script = document.createElement('script');
+                let settled = false;
+
+                const finish = (ok, error) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    script.onload = null;
+                    script.onerror = null;
+
+                    if (ok) {
+                        resolve(true);
+                    } else {
+                        reject(error || new Error(`${sourceLabel} failed`));
+                    }
+                };
+
+                const timer = setTimeout(() => {
+                    recordPinyinLoadAttempt(
+                        sourceLabel,
+                        'TIMEOUT',
+                        `${timeoutMs}ms`
+                    );
+                    finish(
+                        false,
+                        new Error(`${sourceLabel} timeout after ${timeoutMs}ms`)
+                    );
+                }, timeoutMs);
+
+                script.async = true;
+                script.src = url;
+                script.crossOrigin = 'anonymous';
+
+                script.onload = () => {
+                    if (registerPinyinFromGlobal(sourceLabel)) {
+                        recordPinyinLoadAttempt(sourceLabel, 'LOADED');
+                        finish(true);
+                    } else {
+                        recordPinyinLoadAttempt(
+                            sourceLabel,
+                            'SCRIPT_LOADED_BUT_GLOBAL_MISSING'
+                        );
+                        finish(
+                            false,
+                            new Error(
+                                `${sourceLabel} loaded but window.pinyinPro.pinyin is missing`
+                            )
+                        );
+                    }
+                };
+
+                script.onerror = event => {
+                    recordPinyinLoadAttempt(
+                        sourceLabel,
+                        'ERROR',
+                        event && event.type ? event.type : 'script error'
+                    );
+                    finish(false, new Error(`${sourceLabel} script error`));
+                };
+
+                document.head.appendChild(script);
+            });
+        }
+
+        async function ensurePinyinProLoaded() {
+            pinyinLoadAttempts = [];
+
+            if (registerPinyinFromGlobal('preloaded')) {
+                recordPinyinLoadAttempt('preloaded', 'LOADED');
+                return true;
+            }
+
+            /*
+             * 官方文件示例使用 dist/index.js。
+             * 固定 3.28.1，並依序嘗試三個 CDN。
+             */
+            const classicSources = [
+                {
+                    label: 'jsDelivr index.js',
+                    url: 'https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.js'
+                },
+                {
+                    label: 'unpkg index.js',
+                    url: 'https://unpkg.com/pinyin-pro@3.28.1/dist/index.js'
+                },
+                {
+                    label: 'cdnjs index.js',
+                    url: 'https://cdnjs.cloudflare.com/ajax/libs/pinyin-pro/3.28.1/index.js'
+                }
+            ];
+
+            for (const source of classicSources) {
+                try {
+                    await loadPinyinClassicScript(source.url, source.label);
+                    if (pinyinFn) return true;
+                } catch (error) {
+                    console.warn(
+                        `[pinyin-pro] ${source.label} 載入失敗：`,
+                        error
+                    );
+                }
+            }
+
+            /*
+             * 最後嘗試 ESM，失敗也只記錄，不讓整頁程式崩掉。
+             */
+            try {
+                const esmUrl =
+                    'https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.mjs';
+
+                recordPinyinLoadAttempt('jsDelivr ESM', 'START');
+
+                const module = await import(esmUrl);
+
+                if (module && typeof module.pinyin === 'function') {
+                    pinyinFn = module.pinyin;
+                    pinyinLoadSource = 'jsDelivr ESM';
+                    recordPinyinLoadAttempt('jsDelivr ESM', 'LOADED');
+                    return true;
+                }
+
+                recordPinyinLoadAttempt(
+                    'jsDelivr ESM',
+                    'MODULE_LOADED_BUT_PINYIN_MISSING'
+                );
+            } catch (error) {
+                recordPinyinLoadAttempt(
+                    'jsDelivr ESM',
+                    'ERROR',
+                    error && error.message ? error.message : error
+                );
+                console.warn('[pinyin-pro] ESM fallback 載入失敗：', error);
+            }
+
+            pinyinLoadSource = 'FAILED_ALL_SOURCES';
+            return false;
+        }
+
+        function testPinyinEngine() {
+            if (typeof pinyinFn !== 'function') {
+                return {
+                    ok: false,
+                    reason: 'pinyinFn is not a function'
+                };
+            }
+
+            try {
+                const test = pinyinFn('皮卡丘', {
+                    toneType: 'none',
+                    type: 'array'
+                });
+
+                const result = Array.isArray(test)
+                    ? test.join(' ')
+                    : String(test || '');
+
+                return {
+                    ok: Boolean(result),
+                    result
+                };
+            } catch (error) {
+                return {
+                    ok: false,
+                    reason: error && error.message
+                        ? error.message
+                        : String(error)
+                };
+            }
+        }
+
+        window.addEventListener('load', async () => {
+            micBtn.disabled = true;
+            micBtn.textContent = '⏳ 初始化語音判分...';
+            setStatus('⏳ 正在載入注音判分模組...');
+
+            const pinyinReady = await ensurePinyinProLoaded();
+            const pinyinHealth = testPinyinEngine();
+
+            console.groupCollapsed('🧪 V15 pinyin-pro 健康檢查');
+            console.log('loaded:', pinyinReady);
+            console.log('source:', pinyinLoadSource);
+            console.log('health:', pinyinHealth);
+            console.table(pinyinLoadAttempts);
+            console.groupEnd();
 
             if (typeof pokemonDB !== 'undefined' && pokemonDB.length > 0) {
                 validateDataset();
                 refillQuestionBag();
                 loadRandomPokemon();
             } else {
-                setStatus('⏳ 找不到題庫，請確認 dataset.js 是否正確載入。', 'error');
+                setStatus(
+                    '⏳ 找不到題庫，請確認 dataset.js 是否正確載入。',
+                    'error'
+                );
             }
 
             if (!SpeechRecognition) {
-                setStatus('⚠️ 目前瀏覽器不支援語音辨識，請改用支援的瀏覽器。', 'error');
+                setStatus(
+                    '⚠️ 目前瀏覽器不支援語音辨識，請改用支援的瀏覽器。',
+                    'error'
+                );
                 micBtn.disabled = true;
+                micBtn.textContent = '🎤 不支援語音辨識';
+                return;
             }
+
+            if (!pinyinReady || !pinyinHealth.ok) {
+                setStatus(
+                    '❌ 注音判分模組載入失敗。為避免把正確的同音答案誤判成 0 分，語音作答已暫停。請重新整理；若仍失敗，複製診斷紀錄給我。',
+                    'error'
+                );
+                micBtn.disabled = true;
+                micBtn.textContent = '⚠️ 判分模組未載入';
+                return;
+            }
+
+            micBtn.disabled = false;
+            micBtn.textContent = '🎤 按下說話';
+
+            if (currentPokemon) {
+                setStatus(
+                    isReadingMode
+                        ? '請唸出上面的國字'
+                        : '請拼出上面的注音'
+                );
+            }
+
+            console.info(
+                `✅ pinyin-pro 已就緒｜來源：${pinyinLoadSource}｜測試：${pinyinHealth.result}`
+            );
         });
 
         /* =========================================================
@@ -1499,8 +1861,123 @@
         }
 
         /* =========================================================
-         * SpeechRecognition Session - V13
+         * SpeechRecognition Session - V14 Diagnostic
          * ========================================================= */
+
+        const DIAG_STORAGE_KEY = 'pokemonSpeechDiagnosticsV14';
+        const DIAG_MAX_SESSIONS = 30;
+        const MAX_DIAG_EVENTS_PER_SESSION = 120;
+
+        let diagnosticHistory = loadDiagnosticHistory();
+
+        function nowIso() {
+            return new Date().toISOString();
+        }
+
+        function round3(value) {
+            return typeof value === 'number'
+                ? Math.round(value * 1000) / 1000
+                : null;
+        }
+
+        function loadDiagnosticHistory() {
+            try {
+                const raw = localStorage.getItem(DIAG_STORAGE_KEY);
+                const parsed = raw ? JSON.parse(raw) : [];
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                console.warn('讀取語音診斷紀錄失敗：', error);
+                return [];
+            }
+        }
+
+        function saveDiagnosticHistory() {
+            try {
+                localStorage.setItem(
+                    DIAG_STORAGE_KEY,
+                    JSON.stringify(diagnosticHistory.slice(-DIAG_MAX_SESSIONS))
+                );
+            } catch (error) {
+                console.warn('儲存語音診斷紀錄失敗：', error);
+            }
+        }
+
+        function getEnvironmentSnapshot() {
+            return {
+                time: nowIso(),
+                userAgent: navigator.userAgent || '',
+                platform: navigator.platform || '',
+                language: navigator.language || '',
+                online: typeof navigator.onLine === 'boolean' ? navigator.onLine : null,
+                protocol: location.protocol,
+                secureContext: Boolean(window.isSecureContext),
+                speechApi: window.SpeechRecognition
+                    ? 'SpeechRecognition'
+                    : (window.webkitSpeechRecognition ? 'webkitSpeechRecognition' : 'none'),
+                pinyinProLoaded: Boolean(pinyinFn),
+                pinyinLoadSource,
+                pinyinLoadAttempts: pinyinLoadAttempts.slice()
+            };
+        }
+
+        function addDiagEvent(session, type, details = {}) {
+            if (!session || !session.diag) return;
+
+            const elapsedMs = Math.round(performance.now() - session.createdAt);
+            const event = {
+                seq: session.diag.events.length + 1,
+                elapsedMs,
+                type,
+                ...details
+            };
+
+            session.diag.events.push(event);
+
+            if (session.diag.events.length > MAX_DIAG_EVENTS_PER_SESSION) {
+                session.diag.events.shift();
+            }
+
+            console.log(`[Speech #${session.id}] ${type} +${elapsedMs}ms`, details);
+        }
+
+        function snapshotRecognitionResults(event) {
+            const snapshot = {
+                resultIndex:
+                    event && typeof event.resultIndex === 'number'
+                        ? event.resultIndex
+                        : null,
+                results: []
+            };
+
+            if (!event || !event.results) return snapshot;
+
+            for (let resultIndex = 0; resultIndex < event.results.length; resultIndex++) {
+                const result = event.results[resultIndex];
+                if (!result) continue;
+
+                const item = {
+                    index: resultIndex,
+                    isFinal: Boolean(result.isFinal),
+                    alternatives: []
+                };
+
+                for (let i = 0; i < result.length && i < MAX_ALTERNATIVES; i++) {
+                    const alt = result[i];
+                    item.alternatives.push({
+                        rank: i + 1,
+                        transcript: alt && alt.transcript ? alt.transcript.trim() : '',
+                        confidence:
+                            alt && typeof alt.confidence === 'number'
+                                ? round3(alt.confidence)
+                                : null
+                    });
+                }
+
+                snapshot.results.push(item);
+            }
+
+            return snapshot;
+        }
 
         function isCurrentSession(session) {
             return activeSession === session;
@@ -1509,419 +1986,347 @@
         function clearSessionTimers(session) {
             if (!session) return;
 
-            clearTimeout(session.preSpeechTimer);
-            clearTimeout(session.recordingTimer);
-            clearTimeout(session.speechEndTimer);
-            clearTimeout(session.audioStopWatchdogTimer);
-            clearTimeout(session.resultWaitTimer);
-            clearTimeout(session.endGraceTimer);
-            clearTimeout(session.hardLimitTimer);
-            clearTimeout(session.abortSettleTimer);
-
-            session.preSpeechTimer = null;
-            session.recordingTimer = null;
-            session.speechEndTimer = null;
-            session.audioStopWatchdogTimer = null;
-            session.resultWaitTimer = null;
-            session.endGraceTimer = null;
-            session.hardLimitTimer = null;
-            session.abortSettleTimer = null;
+            [
+                'preSpeechTimer',
+                'recordingTimer',
+                'speechEndTimer',
+                'audioStopWatchdogTimer',
+                'resultWaitTimer',
+                'endGraceTimer',
+                'hardLimitTimer',
+                'abortSettleTimer',
+                'earlyDecisionTimer'
+            ].forEach(key => {
+                clearTimeout(session[key]);
+                session[key] = null;
+            });
         }
 
         function logLifecycle(session, eventName, extra = '') {
-            const elapsed = Math.round(performance.now() - session.createdAt);
-            console.log(
-                `[Speech #${session.id}] ${eventName} +${elapsed}ms${extra ? ' | ' + extra : ''}`
-            );
+            addDiagEvent(session, eventName, extra ? { extra } : {});
         }
 
-        function finishSession(session, options = {}) {
-            if (!session || session.finished) {
-                return;
-            }
-
-            session.finished = true;
-            clearSessionTimers(session);
-
-            if (isCurrentSession(session)) {
-                activeSession = null;
-                setMicBusy(false);
-            }
-
-            logLifecycle(
-                session,
-                'SESSION FINISH',
-                `speechStart=${session.speechStarted} audioEnd=${session.audioEnded} end=${session.serviceEnded} final=${session.finalResultHandled} interim=${Boolean(session.bestInterim)} source=${session.resultSource || '-'} stop=${session.stopRequested} abort=${session.abortRequested}`
-            );
-
-            if (
-                !session.cancelled &&
-                !session.resultHandled &&
-                !session.userMessageHandled &&
-                !options.keepStatus
-            ) {
-                setStatus('⏸️ 沒有收到語音辨識結果，再試一次唷！', 'retry');
-            }
-
-            /* 下一次錄音一定建立新的 SpeechRecognition instance。 */
-            session.recognition = null;
+        function normalizeCandidateKey(transcript) {
+            return String(transcript || '')
+                .replace(/[\s，。！？、,.!?：:；;「」『』（）()【】\[\]]+/g, '')
+                .trim();
         }
 
-        function forceAbortSession(session, reason = 'watchdog') {
-            if (
-                !session ||
-                session.finished ||
-                !session.recognition
-            ) {
-                return;
-            }
+        function addCandidate(session, candidate) {
+            if (!session || !candidate || !candidate.transcript) return;
 
-            if (!session.abortRequested) {
-                session.abortRequested = true;
-                logLifecycle(session, 'abort()', reason);
+            const transcript = String(candidate.transcript).trim();
+            const key = normalizeCandidateKey(transcript);
+            if (!key) return;
 
-                try {
-                    session.recognition.abort();
-                } catch (error) {
-                    console.warn(`[Speech #${session.id}] abort() 失敗：`, error);
-                }
-            }
+            let entry = session.candidateMap.get(key);
 
-            clearTimeout(session.abortSettleTimer);
-            session.abortSettleTimer = setTimeout(() => {
-                if (!session.finished) {
-                    console.warn(
-                        `[Speech #${session.id}] abort() 後仍未完整結束，強制釋放本次 instance。`
-                    );
-                    finishSession(session, {
-                        keepStatus:
-                            session.resultHandled ||
-                            session.userMessageHandled ||
-                            session.cancelled
-                    });
-                }
-            }, ABORT_SETTLE_MS);
-        }
-
-        function startHardSessionWatchdog(session) {
-            clearTimeout(session.hardLimitTimer);
-
-            session.hardLimitTimer = setTimeout(() => {
-                if (session.finished) return;
-
-                console.warn(
-                    `[Speech #${session.id}] 超過 ${HARD_SESSION_LIMIT_MS}ms 仍未結束，執行最終 abort。`
-                );
-
-                if (!session.resultHandled && !session.userMessageHandled) {
-                    session.userMessageHandled = true;
-                    setStatus('⏸️ 語音服務沒有回應，請再試一次唷！', 'retry');
-                }
-
-                forceAbortSession(session, 'hard session limit');
-            }, HARD_SESSION_LIMIT_MS);
-        }
-
-        function startAudioStopWatchdog(session) {
-            clearTimeout(session.audioStopWatchdogTimer);
-
-            session.audioStopWatchdogTimer = setTimeout(() => {
-                if (
-                    session.finished ||
-                    session.audioEnded ||
-                    session.serviceEnded
-                ) {
-                    return;
-                }
-
-                console.warn(
-                    `[Speech #${session.id}] stop() 後 ${AUDIO_STOP_WATCHDOG_MS}ms 仍沒有 audioend/end，才執行 abort()。`
-                );
-
-                forceAbortSession(session, 'audio stop watchdog');
-            }, AUDIO_STOP_WATCHDOG_MS);
-        }
-
-        function requestStop(session, reason = 'timer', updateMessage = true) {
-            if (
-                !session ||
-                session.finished ||
-                session.serviceEnded ||
-                !session.recognition
-            ) {
-                return;
-            }
-
-            if (session.stopRequested) {
-                return;
-            }
-
-            session.stopRequested = true;
-            clearTimeout(session.preSpeechTimer);
-            clearTimeout(session.recordingTimer);
-            clearTimeout(session.speechEndTimer);
-
-            if (updateMessage && !session.cancelled) {
-                setStatus('⏳ 錄音結束，語音分析中...');
-                setMicBusy(true, '⏳ 分析中...');
-            }
-
-            logLifecycle(session, 'stop()', reason);
-
-            try {
-                session.recognition.stop();
-            } catch (error) {
-                console.warn(`[Speech #${session.id}] stop() 失敗：`, error);
-                forceAbortSession(session, 'stop() threw');
-                return;
-            }
-
-            /*
-             * 這個 watchdog 只處理「音訊擷取沒有停」的情況。
-             * 不再像 V2 一樣很快就因為結果尚未回來而 abort。
-             */
-            startAudioStopWatchdog(session);
-        }
-
-        function cancelActiveRecognition(reason = 'cancel', silent = false) {
-            const session = activeSession;
-
-            if (!session || session.finished) {
-                return;
-            }
-
-            session.cancelled = true;
-            session.userMessageHandled = true;
-
-            logLifecycle(session, 'CANCEL', reason);
-            forceAbortSession(session, reason);
-
-            if (!silent) {
-                setStatus('⏸️ 錄音已取消。', 'retry');
-            }
-        }
-
-        /*
-         * 將 event.results 的多個片段組成「完整一句」候選。
-         *
-         * 舊版是把每個 SpeechRecognitionResult 各自當成完整答案；
-         * 如果 Safari/Chrome 把「皮卡丘」拆成兩段，就可能只拿「皮卡」先判分。
-         *
-         * V13 使用小型 beam 組合，每段最多拿 MAX_ALTERNATIVES 個候選，
-         * 最終讓最多 MAX_UTTERANCE_CANDIDATES 個完整 utterance 進入判分。
-         */
-        function collectResultAlternatives(event) {
-            if (!event || !event.results || !event.results.length) {
-                return {
-                    finalAlternatives: [],
-                    interimAlternatives: []
+            if (!entry) {
+                entry = {
+                    transcript,
+                    sources: new Set(),
+                    seenCount: 0,
+                    finalSeen: false,
+                    interimSeen: false,
+                    bestConfidence: null,
+                    firstSeenMs: Math.round(performance.now() - session.createdAt),
+                    lastSeenMs: null
                 };
+                session.candidateMap.set(key, entry);
             }
 
-            let beams = [{
-                transcript: '',
-                confidenceTotal: 0,
-                confidenceCount: 0,
-                rankPenalty: 0
-            }];
+            entry.seenCount++;
+            entry.lastSeenMs = Math.round(performance.now() - session.createdAt);
+            entry.sources.add(candidate.source || 'UNKNOWN');
 
-            let hasUsableResult = false;
+            if (candidate.isFinal) entry.finalSeen = true;
+            if (candidate.isInterim) entry.interimSeen = true;
+
+            if (
+                typeof candidate.confidence === 'number' &&
+                (
+                    entry.bestConfidence === null ||
+                    candidate.confidence > entry.bestConfidence
+                )
+            ) {
+                entry.bestConfidence = candidate.confidence;
+            }
+        }
+
+        function buildFullUtteranceCandidates(event) {
+            if (!event || !event.results || !event.results.length) {
+                return [];
+            }
+
+            let beams = [{ transcript: '', confidenceTotal: 0, confidenceCount: 0, rankPenalty: 0 }];
             let allFinal = true;
+            let anyResult = false;
 
-            for (let resultIndex = 0; resultIndex < event.results.length; resultIndex++) {
-                const result = event.results[resultIndex];
+            for (let r = 0; r < event.results.length; r++) {
+                const result = event.results[r];
                 if (!result || !result.length) continue;
 
-                hasUsableResult = true;
+                anyResult = true;
+                if (!result.isFinal) allFinal = false;
 
-                if (!result.isFinal) {
-                    allFinal = false;
-                }
-
-                const segmentAlternatives = [];
-
+                const alts = [];
                 for (let i = 0; i < result.length && i < MAX_ALTERNATIVES; i++) {
-                    const alternative = result[i];
-                    const transcript = alternative && alternative.transcript
-                        ? alternative.transcript.trim()
-                        : '';
-
+                    const alt = result[i];
+                    const transcript = alt && alt.transcript ? alt.transcript.trim() : '';
                     if (!transcript) continue;
-
-                    segmentAlternatives.push({
+                    alts.push({
                         transcript,
                         confidence:
-                            typeof alternative.confidence === 'number'
-                                ? alternative.confidence
+                            typeof alt.confidence === 'number'
+                                ? alt.confidence
                                 : null,
                         rank: i
                     });
                 }
 
-                if (!segmentAlternatives.length) {
-                    continue;
-                }
+                if (!alts.length) continue;
 
-                const nextBeams = [];
-
+                const next = [];
                 for (const beam of beams) {
-                    for (const alternative of segmentAlternatives) {
-                        const confidenceIsNumber =
-                            typeof alternative.confidence === 'number';
-
-                        nextBeams.push({
-                            transcript: `${beam.transcript} ${alternative.transcript}`.trim(),
-                            confidenceTotal:
-                                beam.confidenceTotal +
-                                (confidenceIsNumber ? alternative.confidence : 0),
-                            confidenceCount:
-                                beam.confidenceCount +
-                                (confidenceIsNumber ? 1 : 0),
-                            rankPenalty:
-                                beam.rankPenalty + alternative.rank
+                    for (const alt of alts) {
+                        const hasConfidence = typeof alt.confidence === 'number';
+                        next.push({
+                            transcript: `${beam.transcript} ${alt.transcript}`.trim(),
+                            confidenceTotal: beam.confidenceTotal + (hasConfidence ? alt.confidence : 0),
+                            confidenceCount: beam.confidenceCount + (hasConfidence ? 1 : 0),
+                            rankPenalty: beam.rankPenalty + alt.rank
                         });
                     }
                 }
 
-                /*
-                 * 先保留原始順位較好的組合，再用 confidence 輔助。
-                 * 真正的語音相似度會在 evaluateAlternatives() 再排序。
-                 */
-                nextBeams.sort((a, b) => {
+                next.sort((a, b) => {
                     if (a.rankPenalty !== b.rankPenalty) {
                         return a.rankPenalty - b.rankPenalty;
                     }
-
-                    const aConfidence = a.confidenceCount
-                        ? a.confidenceTotal / a.confidenceCount
-                        : 0;
-                    const bConfidence = b.confidenceCount
-                        ? b.confidenceTotal / b.confidenceCount
-                        : 0;
-
-                    return bConfidence - aConfidence;
+                    const ac = a.confidenceCount ? a.confidenceTotal / a.confidenceCount : 0;
+                    const bc = b.confidenceCount ? b.confidenceTotal / b.confidenceCount : 0;
+                    return bc - ac;
                 });
 
-                beams = nextBeams.slice(0, MAX_UTTERANCE_CANDIDATES);
+                beams = next.slice(0, MAX_UTTERANCE_CANDIDATES);
             }
 
-            if (!hasUsableResult) {
-                return {
-                    finalAlternatives: [],
-                    interimAlternatives: []
-                };
-            }
+            if (!anyResult) return [];
 
-            const seen = new Set();
-            const alternatives = [];
-
-            for (const beam of beams) {
-                const transcript = beam.transcript.trim();
-                if (!transcript || seen.has(transcript)) {
-                    continue;
-                }
-
-                seen.add(transcript);
-
-                alternatives.push({
-                    transcript,
-                    confidence:
-                        beam.confidenceCount
-                            ? beam.confidenceTotal / beam.confidenceCount
-                            : null
-                });
-
-                if (alternatives.length >= MAX_UTTERANCE_CANDIDATES) {
-                    break;
-                }
-            }
-
-            return allFinal
-                ? {
-                    finalAlternatives: alternatives,
-                    interimAlternatives: []
-                }
-                : {
-                    finalAlternatives: [],
-                    interimAlternatives: alternatives
-                };
+            return beams.map(beam => ({
+                transcript: beam.transcript,
+                confidence:
+                    beam.confidenceCount
+                        ? beam.confidenceTotal / beam.confidenceCount
+                        : null,
+                source: allFinal ? 'FULL_FINAL' : 'FULL_MIXED',
+                isFinal: allFinal,
+                isInterim: !allFinal
+            }));
         }
 
-        function evaluateAlternatives(alternatives, pokemon) {
-            const evaluations = alternatives.map((alternative, index) => {
-                const evaluation = evaluateTranscript(alternative.transcript, pokemon);
+        function captureRecognitionResult(session, event) {
+            if (!session || session.finished || session.cancelled) return;
 
-                return {
-                    rank: index + 1,
-                    confidence: alternative.confidence,
-                    ...evaluation
-                };
+            const rawSnapshot = snapshotRecognitionResults(event);
+            session.diag.rawResultEvents.push({
+                elapsedMs: Math.round(performance.now() - session.createdAt),
+                ...rawSnapshot
             });
 
-            evaluations.sort((a, b) => {
-                if (b.score !== a.score) {
-                    return b.score - a.score;
-                }
+            let hasFinal = false;
+            let hasInterim = false;
 
+            for (const resultItem of rawSnapshot.results) {
+                if (resultItem.isFinal) hasFinal = true;
+                else hasInterim = true;
+
+                for (const alt of resultItem.alternatives) {
+                    addCandidate(session, {
+                        transcript: alt.transcript,
+                        confidence: alt.confidence,
+                        source: resultItem.isFinal ? 'FINAL_SEGMENT' : 'INTERIM_SEGMENT',
+                        isFinal: resultItem.isFinal,
+                        isInterim: !resultItem.isFinal
+                    });
+                }
+            }
+
+            const fullCandidates = buildFullUtteranceCandidates(event);
+            fullCandidates.forEach(candidate => addCandidate(session, candidate));
+
+            addDiagEvent(
+                session,
+                hasFinal ? (hasInterim ? 'result(mixed)' : 'result(final)') : 'result(interim)',
+                {
+                    resultIndex: rawSnapshot.resultIndex,
+                    resultCount: rawSnapshot.results.length,
+                    candidatePoolSize: session.candidateMap.size
+                }
+            );
+
+            renderLiveDiagnostic(session);
+        }
+
+        function evaluateSessionCandidates(session) {
+            const rows = [];
+
+            for (const entry of session.candidateMap.values()) {
+                const evaluation = evaluateTranscript(
+                    entry.transcript,
+                    session.targetPokemon
+                );
+
+                rows.push({
+                    ...evaluation,
+                    sources: Array.from(entry.sources),
+                    seenCount: entry.seenCount,
+                    finalSeen: entry.finalSeen,
+                    interimSeen: entry.interimSeen,
+                    confidence: entry.bestConfidence,
+                    firstSeenMs: entry.firstSeenMs,
+                    lastSeenMs: entry.lastSeenMs
+                });
+            }
+
+            rows.sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                if (Number(b.exactTextMatch) !== Number(a.exactTextMatch)) {
+                    return Number(b.exactTextMatch) - Number(a.exactTextMatch);
+                }
+                if (Number(b.exactZhuyinMatch) !== Number(a.exactZhuyinMatch)) {
+                    return Number(b.exactZhuyinMatch) - Number(a.exactZhuyinMatch);
+                }
+                if (Number(b.finalSeen) !== Number(a.finalSeen)) {
+                    return Number(b.finalSeen) - Number(a.finalSeen);
+                }
+                if (b.seenCount !== a.seenCount) return b.seenCount - a.seenCount;
                 return (b.confidence || 0) - (a.confidence || 0);
             });
 
-            return evaluations;
+            return rows;
         }
 
-        function logEvaluations(session, pokemon, evaluations, sourceLabel) {
-            console.group(`🎤 Speech #${session.id}｜題目：${pokemon.name}｜${sourceLabel}`);
-            console.log('題庫標準注音：', getTargetZhuyin(pokemon).join(' / '));
-            console.table(
-                evaluations.map(item => ({
-                    原始順位: item.rank,
-                    辨識文字: item.transcript,
-                    confidence:
-                        item.confidence === null
-                            ? ''
-                            : Math.round(item.confidence * 1000) / 1000,
-                    辨識注音: item.spokenZhuyin.join(' / '),
-                    最佳區段: item.bestWindow.join(' / '),
-                    原始分數: `${item.rawScore ?? item.score}%`,
-                    最終分數: `${item.score}%`,
-                    判定類型: item.matchType || '',
-                    文字直接命中: item.exactTextMatch ? 'YES' : '',
-                    注音完全命中: item.exactZhuyinMatch ? 'YES' : '',
-                    近音救援: item.phoneticRescue ? 'YES' : ''
-                }))
-            );
-            console.log('最佳候選：', evaluations[0]);
-            console.groupEnd();
-        }
-
-        function applyEvaluations(session, evaluations, sourceLabel = 'FINAL') {
-            if (
-                !isCurrentSession(session) ||
-                session.finished ||
-                session.cancelled ||
-                session.resultHandled ||
-                !evaluations.length
-            ) {
-                return false;
+        function selectSessionEvidence(session, evaluations) {
+            if (!evaluations.length) {
+                return {
+                    selected: null,
+                    reason: 'NO_CANDIDATE'
+                };
             }
 
-            const pokemon = session.targetPokemon;
+            const exactStrong = evaluations.find(item =>
+                (item.exactTextMatch || item.exactZhuyinMatch) &&
+                (item.finalSeen || item.seenCount >= 2)
+            );
+
+            if (exactStrong) {
+                return {
+                    selected: exactStrong,
+                    reason: exactStrong.exactTextMatch
+                        ? 'EXACT_TEXT_CONFIRMED'
+                        : 'EXACT_ZHUYIN_CONFIRMED'
+                };
+            }
+
+            const bestFinal = evaluations.find(item => item.finalSeen) || null;
+            if (bestFinal && bestFinal.score >= SCORE_CORRECT) {
+                return {
+                    selected: bestFinal,
+                    reason: 'BEST_FINAL_OVER_THRESHOLD'
+                };
+            }
+
             const best = evaluations[0];
+            const stableHighCandidate =
+                best.score >= SCORE_CORRECT &&
+                (
+                    best.seenCount >= 2 ||
+                    (bestFinal && bestFinal.score >= SCORE_CLOSE)
+                );
+
+            if (stableHighCandidate) {
+                return {
+                    selected: best,
+                    reason: 'SESSION_POOL_HIGH_CONFIDENCE'
+                };
+            }
+
+            return {
+                selected: bestFinal || best,
+                reason: bestFinal ? 'BEST_FINAL_BELOW_THRESHOLD' : 'BEST_AVAILABLE_BELOW_THRESHOLD'
+            };
+        }
+
+        function inferDiagnosticCategory(session, selected, evaluations) {
+            if (session.diag.lastError) {
+                return `BROWSER_ERROR:${session.diag.lastError}`;
+            }
+
+            if (!pinyinFn) {
+                return 'PINYIN_PRO_NOT_LOADED';
+            }
+
+            if (!evaluations.length || !selected) {
+                return session.speechStarted
+                    ? 'NO_ASR_RESULT_AFTER_SPEECH'
+                    : 'NO_SPEECH_DETECTED';
+            }
+
+            const targetLength = getTargetZhuyin(session.targetPokemon).length;
+            const spokenLength = selected.bestWindow ? selected.bestWindow.length : 0;
+
+            if (selected.score >= SCORE_CORRECT) {
+                return 'SUCCESS';
+            }
+
+            if (targetLength >= 2 && spokenLength > 0 && spokenLength < targetLength) {
+                return 'POSSIBLE_TRUNCATION_OR_PARTIAL_TRANSCRIPT';
+            }
+
+            if (selected.score >= SCORE_CLOSE) {
+                return 'NEAR_MISS_SCORING_OR_ASR_ONE_SOUND_OFF';
+            }
+
+            if (selected.score < 50) {
+                return 'ASR_TRANSCRIPT_FAR_FROM_TARGET';
+            }
+
+            return 'ASR_OR_SCORING_MISMATCH';
+        }
+
+        function applyFinalDecision(session, selected, reason, evaluations, finalizeReason) {
+            if (!session || session.resultHandled || session.cancelled) return false;
 
             session.resultHandled = true;
             session.userMessageHandled = true;
-            session.finalResultHandled = sourceLabel === 'FINAL';
-            session.resultSource = sourceLabel;
+            session.resultSource = reason;
+            session.diag.finalizeReason = finalizeReason;
 
-            logEvaluations(session, pokemon, evaluations, sourceLabel);
+            const category = inferDiagnosticCategory(session, selected, evaluations);
+            session.diag.diagnosticCategory = category;
 
-            if (
-                currentPokemon === pokemon &&
-                best.score >= SCORE_CORRECT
-            ) {
-                setStatus(`🎉 太棒了！答案是「${pokemon.name}」！`, 'success');
+            if (!selected) {
+                setStatus('⏸️ 有收到錄音流程，但沒有可判斷的語音文字。請再試一次。', 'retry');
+                session.diag.decision = {
+                    outcome: 'NO_RESULT',
+                    reason,
+                    category
+                };
+                return true;
+            }
+
+            const success =
+                currentPokemon === session.targetPokemon &&
+                selected.score >= SCORE_CORRECT;
+
+            let outcome = 'RETRY';
+            if (success) {
+                outcome = 'SUCCESS';
+                setStatus(`🎉 太棒了！答案是「${session.targetPokemon.name}」！`, 'success');
                 revealAnswer();
-            } else if (best.score >= SCORE_CLOSE) {
+            } else if (selected.score >= SCORE_CLOSE) {
+                outcome = 'CLOSE';
                 setStatus('😊 差一點點，再試一次！', 'close');
             } else {
                 setStatus(
@@ -1932,227 +2337,569 @@
                 );
             }
 
+            session.diag.decision = {
+                outcome,
+                reason,
+                category,
+                transcript: selected.transcript,
+                score: selected.score,
+                rawScore: selected.rawScore,
+                matchType: selected.matchType,
+                spokenZhuyin: selected.spokenZhuyin,
+                bestWindow: selected.bestWindow,
+                targetZhuyin: selected.targetZhuyin,
+                sources: selected.sources,
+                seenCount: selected.seenCount,
+                finalSeen: selected.finalSeen,
+                confidence: selected.confidence
+            };
+
             return true;
         }
 
-        function rememberInterimResult(session, alternatives) {
-            if (!alternatives.length || session.finished || session.resultHandled) {
-                return;
-            }
-
-            const evaluations = evaluateAlternatives(
-                alternatives,
-                session.targetPokemon
-            );
-
-            if (!evaluations.length) return;
-
-            const newestBest = evaluations[0];
-
-            /*
-             * 保留目前分數最高的 interim。
-             * 如果分數相同，較新的結果取代舊結果。
-             */
-            if (
-                !session.bestInterim ||
-                newestBest.score >= session.bestInterim.evaluations[0].score
-            ) {
-                session.bestInterim = {
-                    evaluations,
-                    savedAt: performance.now()
-                };
-            }
-
-            logLifecycle(
-                session,
-                'interim',
-                `${newestBest.transcript} | score=${newestBest.score}%`
-            );
-
-            if (isCurrentSession(session) && !session.cancelled) {
-                setStatus('🎙️ 有聽到聲音，請把答案說完');
-            }
-        }
-
-        function useInterimFallback(session, reason = 'no final result') {
-            if (
-                !session ||
-                session.finished ||
-                session.resultHandled ||
-                !session.bestInterim
-            ) {
+        function finalizeRecognitionDecision(session, reason = 'session finalize') {
+            if (!session || session.resultHandled || session.cancelled) {
                 return false;
             }
 
-            logLifecycle(session, 'INTERIM FALLBACK', reason);
+            const evaluations = evaluateSessionCandidates(session);
+            session.diag.evaluations = evaluations.slice(0, 20).map(item => ({
+                transcript: item.transcript,
+                score: item.score,
+                rawScore: item.rawScore,
+                matchType: item.matchType,
+                cleanText: item.cleanText,
+                spokenZhuyin: item.spokenZhuyin,
+                bestWindow: item.bestWindow,
+                targetZhuyin: item.targetZhuyin,
+                exactTextMatch: item.exactTextMatch,
+                exactZhuyinMatch: item.exactZhuyinMatch,
+                phoneticRescue: item.phoneticRescue,
+                sources: item.sources,
+                seenCount: item.seenCount,
+                finalSeen: item.finalSeen,
+                interimSeen: item.interimSeen,
+                confidence: round3(item.confidence),
+                firstSeenMs: item.firstSeenMs,
+                lastSeenMs: item.lastSeenMs
+            }));
 
-            return applyEvaluations(
+            const selection = selectSessionEvidence(session, evaluations);
+
+            addDiagEvent(session, 'FINALIZE_DECISION', {
+                reason,
+                candidateCount: evaluations.length,
+                selectedTranscript: selection.selected ? selection.selected.transcript : '',
+                selectedScore: selection.selected ? selection.selected.score : null,
+                selectionReason: selection.reason
+            });
+
+            return applyFinalDecision(
                 session,
-                session.bestInterim.evaluations,
-                'INTERIM FALLBACK'
+                selection.selected,
+                selection.reason,
+                evaluations,
+                reason
             );
         }
 
-        function chooseFinalOrInterimEvidence(session, finalEvaluations) {
-            const finalBest = finalEvaluations && finalEvaluations[0];
-            const interimEvaluations =
-                session.bestInterim &&
-                session.bestInterim.evaluations &&
-                session.bestInterim.evaluations.length
-                    ? session.bestInterim.evaluations
-                    : null;
 
-            const interimBest = interimEvaluations && interimEvaluations[0];
-
-            if (!finalBest) {
-                return {
-                    evaluations: interimEvaluations || [],
-                    sourceLabel: 'INTERIM FALLBACK'
-                };
-            }
-
-            /*
-             * Final 自己已經過 90，直接相信 Final。
-             * 不需要因 interim 更高就改來源，避免過度使用暫存結果。
-             */
-            if (finalBest.score >= SCORE_CORRECT) {
-                return {
-                    evaluations: finalEvaluations,
-                    sourceLabel: 'FINAL'
-                };
-            }
-
-            if (!interimBest || interimBest.score < SCORE_CORRECT) {
-                return {
-                    evaluations: finalEvaluations,
-                    sourceLabel: 'FINAL'
-                };
-            }
-
-            /*
-             * 強 Interim 救援條件：
-             * 1. Interim 本身已經 >= 90。
-             * 2. Final 至少還有 75，表示兩者並非完全不同的一句話。
-             * 3. Interim 必須是非常強的證據：
-             *    - 文字直接命中
-             *    - 注音完全命中
-             *    - 或保守近音救援
-             *
-             * 這是為了救回「interim 很準，但 final 最後改錯一個字」，
-             * 同時避免一閃而過的 hallucinated interim 造成誤判成功。
-             */
-            const interimIsStrongEvidence =
-                interimBest.exactTextMatch ||
-                interimBest.exactZhuyinMatch ||
-                interimBest.phoneticRescue;
-
-            if (
-                interimIsStrongEvidence &&
-                finalBest.score >= INTERIM_RESCUE_MIN_FINAL_SCORE
-            ) {
-                console.info(
-                    `[Speech #${session.id}] 使用強 Interim 救援 Final：`,
-                    {
-                        final: {
-                            transcript: finalBest.transcript,
-                            score: finalBest.score,
-                            matchType: finalBest.matchType
-                        },
-                        interim: {
-                            transcript: interimBest.transcript,
-                            score: interimBest.score,
-                            matchType: interimBest.matchType
-                        }
-                    }
-                );
-
-                return {
-                    evaluations: interimEvaluations,
-                    sourceLabel: 'INTERIM RESCUE'
-                };
-            }
-
-            return {
-                evaluations: finalEvaluations,
-                sourceLabel: 'FINAL'
-            };
+        /*
+         * V16 Fast Decision
+         * -----------------
+         * 收到 result 後立即評估目前整個 candidate pool，
+         * 只有「證據已經足夠強」才提早結束。
+         * 模糊答案不會被強制提前判錯。
+         */
+        function getBestFinalEvaluation(session) {
+            const evaluations = evaluateSessionCandidates(session);
+            const bestFinal = evaluations.find(item => item.finalSeen) || null;
+            return { evaluations, bestFinal };
         }
 
-        function processRecognitionResult(session, event) {
+        function finishFastSuccess(session, reason) {
             if (
-                !isCurrentSession(session) ||
+                !session ||
                 session.finished ||
                 session.cancelled ||
                 session.resultHandled
             ) {
+                return false;
+            }
+
+            const applied = finalizeRecognitionDecision(session, reason);
+
+            if (applied) {
+                addDiagEvent(session, 'FAST_DECISION_SUCCESS', { reason });
+                requestStop(session, reason, false);
+            }
+
+            return applied;
+        }
+
+        function scheduleFastDecision(session, delayMs, reason, mode = 'success') {
+            if (!session || session.finished || session.cancelled || session.resultHandled) {
                 return;
             }
 
-            const {
-                finalAlternatives,
-                interimAlternatives
-            } = collectResultAlternatives(event);
+            clearTimeout(session.earlyDecisionTimer);
 
-            if (interimAlternatives.length) {
-                rememberInterimResult(session, interimAlternatives);
-                return;
-            }
+            session.earlyDecisionTimer = setTimeout(() => {
+                if (
+                    session.finished ||
+                    session.cancelled ||
+                    session.resultHandled
+                ) {
+                    return;
+                }
 
-            if (finalAlternatives.length) {
-                const finalEvaluations = evaluateAlternatives(
-                    finalAlternatives,
-                    session.targetPokemon
-                );
+                const { evaluations, bestFinal } = getBestFinalEvaluation(session);
 
-                const selected = chooseFinalOrInterimEvidence(
-                    session,
-                    finalEvaluations
-                );
+                if (!bestFinal) {
+                    return;
+                }
+
+                if (mode === 'success') {
+                    if (bestFinal.score >= SCORE_CORRECT) {
+                        finishFastSuccess(session, reason);
+                    }
+                    return;
+                }
+
+                /*
+                 * 分數不足時不直接判斷，只代表「使用者應該已經把答案講完」。
+                 * 先 stop，真正判分仍走完整 session pool。
+                 */
+                const targetLength = getTargetZhuyin(session.targetPokemon).length;
+                const spokenLength = Array.isArray(bestFinal.spokenZhuyin)
+                    ? bestFinal.spokenZhuyin.length
+                    : 0;
 
                 if (
-                    selected.evaluations.length &&
-                    applyEvaluations(
-                        session,
-                        selected.evaluations,
-                        selected.sourceLabel
+                    bestFinal.finalSeen &&
+                    (
+                        spokenLength >= targetLength ||
+                        String(bestFinal.cleanText || '').length >= targetLength
                     )
                 ) {
+                    addDiagEvent(session, 'FAST_STOP_COMPLETE_FINAL', {
+                        reason,
+                        bestFinalTranscript: bestFinal.transcript,
+                        bestFinalScore: bestFinal.score,
+                        delayMs
+                    });
+
                     requestStop(
                         session,
-                        `${selected.sourceLabel} result received`,
-                        false
+                        reason,
+                        true
                     );
                 }
+            }, delayMs);
+        }
+
+        function considerFastDecision(session) {
+            if (
+                !session ||
+                session.finished ||
+                session.cancelled ||
+                session.resultHandled ||
+                session.stopRequested
+            ) {
+                return;
+            }
+
+            const { evaluations, bestFinal } = getBestFinalEvaluation(session);
+
+            if (!bestFinal) {
+                return;
+            }
+
+            /*
+             * 最強證據：Final 已完全命中文字或注音。
+             * 這種情況沒有必要再等剩餘收音時間。
+             */
+            if (
+                bestFinal.exactTextMatch ||
+                bestFinal.exactZhuyinMatch
+            ) {
+                clearTimeout(session.earlyDecisionTimer);
+
+                addDiagEvent(session, 'FAST_DECISION_EXACT_FINAL', {
+                    transcript: bestFinal.transcript,
+                    score: bestFinal.score,
+                    matchType: bestFinal.matchType
+                });
+
+                finishFastSuccess(
+                    session,
+                    bestFinal.exactTextMatch
+                        ? 'fast exact-text final'
+                        : 'fast exact-zhuyin final'
+                );
+                return;
+            }
+
+            /*
+             * >= 90 的 Final 仍是成功證據，但不是 exact，
+             * 留 250ms 看瀏覽器是否立刻修正結果。
+             */
+            if (bestFinal.score >= SCORE_CORRECT) {
+                addDiagEvent(session, 'FAST_DECISION_HIGH_FINAL_PENDING', {
+                    transcript: bestFinal.transcript,
+                    score: bestFinal.score,
+                    confirmMs: FAST_FINAL_CONFIRM_MS
+                });
+
+                scheduleFastDecision(
+                    session,
+                    FAST_FINAL_CONFIRM_MS,
+                    'fast high-score final',
+                    'success'
+                );
+                return;
+            }
+
+            /*
+             * 已經有一個看起來完整的 Final，但未達成功門檻：
+             * 不判錯，只再聽 900ms。
+             * 若期間有新 result，onresult 會取消並重新評估。
+             */
+            const targetLength = getTargetZhuyin(session.targetPokemon).length;
+            const spokenLength = Array.isArray(bestFinal.spokenZhuyin)
+                ? bestFinal.spokenZhuyin.length
+                : 0;
+
+            if (
+                spokenLength >= targetLength ||
+                String(bestFinal.cleanText || '').length >= targetLength
+            ) {
+                addDiagEvent(session, 'FAST_STOP_LOW_FINAL_PENDING', {
+                    transcript: bestFinal.transcript,
+                    score: bestFinal.score,
+                    settleMs: FINAL_BELOW_THRESHOLD_SETTLE_MS
+                });
+
+                scheduleFastDecision(
+                    session,
+                    FINAL_BELOW_THRESHOLD_SETTLE_MS,
+                    'complete final settled below threshold',
+                    'stop-only'
+                );
+            }
+        }
+
+        function formatDiagnosticRecord(record) {
+            if (!record) return '尚無語音診斷紀錄。';
+
+            const lines = [];
+            const d = record.decision || {};
+
+            lines.push(`=== V16 Speech Diagnostic | Session #${record.id} ===`);
+            lines.push(`時間: ${record.startedAt || ''}`);
+            lines.push(`題目: ${record.targetName || ''}`);
+            lines.push(`標準注音: ${(record.targetZhuyin || []).join(' / ')}`);
+            lines.push(`模式: ${record.mode || ''}`);
+            lines.push(`結果: ${d.outcome || '未完成'}`);
+            lines.push(`診斷分類: ${record.diagnosticCategory || d.category || ''}`);
+            lines.push(`採用原因: ${d.reason || ''}`);
+            lines.push(`結束原因: ${record.finalizeReason || record.stopReason || ''}`);
+            lines.push(`採用文字: ${d.transcript || ''}`);
+            lines.push(`採用注音: ${(d.spokenZhuyin || []).join(' / ')}`);
+            lines.push(`最佳區段: ${(d.bestWindow || []).join(' / ')}`);
+            lines.push(`分數: ${d.score ?? ''} (raw ${d.rawScore ?? ''})`);
+            lines.push(`matchType: ${d.matchType || ''}`);
+            lines.push(`來源: ${(d.sources || []).join(', ')}`);
+            lines.push(`seenCount: ${d.seenCount ?? ''} | finalSeen: ${d.finalSeen ?? ''} | confidence: ${d.confidence ?? ''}`);
+            lines.push('');
+            lines.push('--- Environment ---');
+            const env = record.environment || {};
+            lines.push(`Speech API: ${env.speechApi || ''}`);
+            lines.push(`pinyin-pro: ${env.pinyinProLoaded ? 'loaded' : 'NOT loaded'}`);
+            lines.push(`pinyin source: ${env.pinyinLoadSource || ''}`);
+            if (Array.isArray(env.pinyinLoadAttempts) && env.pinyinLoadAttempts.length) {
+                lines.push(
+                    `pinyin attempts: ${env.pinyinLoadAttempts.map(item =>
+                        `${item.source}:${item.status}${item.extra ? `(${item.extra})` : ''}`
+                    ).join(' | ')}`
+                );
+            }
+            lines.push(`secureContext: ${env.secureContext}`);
+            lines.push(`UA: ${env.userAgent || ''}`);
+            lines.push('');
+            lines.push('--- Raw Recognition Events ---');
+
+            (record.rawResultEvents || []).forEach((evt, index) => {
+                lines.push(`#${index + 1} +${evt.elapsedMs}ms resultIndex=${evt.resultIndex}`);
+                (evt.results || []).forEach(result => {
+                    lines.push(`  result[${result.index}] ${result.isFinal ? 'FINAL' : 'INTERIM'}`);
+                    (result.alternatives || []).forEach(alt => {
+                        lines.push(`    ${alt.rank}. "${alt.transcript}" confidence=${alt.confidence ?? ''}`);
+                    });
+                });
+            });
+
+            lines.push('');
+            lines.push('--- Ranked Candidate Evaluations ---');
+            (record.evaluations || []).forEach((item, index) => {
+                lines.push(
+                    `${index + 1}. "${item.transcript}" score=${item.score} raw=${item.rawScore} ` +
+                    `type=${item.matchType} final=${item.finalSeen} seen=${item.seenCount} ` +
+                    `confidence=${item.confidence ?? ''}`
+                );
+                lines.push(`   zhuyin: ${(item.spokenZhuyin || []).join(' / ')}`);
+                lines.push(`   best:   ${(item.bestWindow || []).join(' / ')}`);
+                lines.push(`   source: ${(item.sources || []).join(', ')}`);
+            });
+
+            lines.push('');
+            lines.push('--- Event Timeline ---');
+            (record.events || []).forEach(evt => {
+                const rest = { ...evt };
+                delete rest.seq;
+                delete rest.elapsedMs;
+                delete rest.type;
+                const detail = Object.keys(rest).length ? ` ${JSON.stringify(rest)}` : '';
+                lines.push(`${String(evt.seq).padStart(2, '0')}. +${evt.elapsedMs}ms ${evt.type}${detail}`);
+            });
+
+            return lines.join('\n');
+        }
+
+        function renderSavedDiagnostic(record) {
+            if (!record) {
+                diagnosticSummary.textContent = '尚未有語音測試紀錄。';
+                diagnosticOutput.textContent = '按下麥克風測試後，這裡會顯示完整辨識流程。';
+                return;
+            }
+
+            const d = record.decision || {};
+            diagnosticSummary.textContent = [
+                `Session #${record.id}｜${record.targetName}`,
+                `結果：${d.outcome || '未完成'}｜診斷：${record.diagnosticCategory || d.category || '尚未分類'}`,
+                `瀏覽器採用文字：${d.transcript || '（無）'}`,
+                `分數：${d.score ?? '—'}｜結束原因：${record.finalizeReason || record.stopReason || '—'}`
+            ].join('\n');
+
+            diagnosticOutput.textContent = formatDiagnosticRecord(record);
+        }
+
+        function renderLiveDiagnostic(session) {
+            if (!session || !session.diag) return;
+            const rawEvents = session.diag.rawResultEvents || [];
+            const latest = rawEvents[rawEvents.length - 1];
+            let latestText = '';
+
+            if (latest && latest.results) {
+                const pieces = [];
+                latest.results.forEach(result => {
+                    const first = result.alternatives && result.alternatives[0];
+                    if (first && first.transcript) pieces.push(first.transcript);
+                });
+                latestText = pieces.join(' / ');
+            }
+
+            diagnosticSummary.textContent = [
+                `Session #${session.id}｜題目：${session.targetPokemon.name}`,
+                `狀態：錄音/辨識中｜候選池：${session.candidateMap.size}`,
+                `目前瀏覽器聽到：${latestText || '等待結果中...'}`
+            ].join('\n');
+        }
+
+        function serializeSessionDiagnostic(session) {
+            return {
+                id: session.id,
+                startedAt: session.diag.startedAt,
+                finishedAt: nowIso(),
+                targetName: session.targetPokemon.name,
+                targetZhuyin: getTargetZhuyin(session.targetPokemon),
+                mode: session.diag.mode,
+                environment: session.diag.environment,
+                recognitionConfig: session.diag.recognitionConfig,
+                stopReason: session.stopReason || '',
+                finalizeReason: session.diag.finalizeReason || '',
+                diagnosticCategory: session.diag.diagnosticCategory || '',
+                lastError: session.diag.lastError || '',
+                decision: session.diag.decision || null,
+                evaluations: session.diag.evaluations || [],
+                rawResultEvents: session.diag.rawResultEvents || [],
+                events: session.diag.events || []
+            };
+        }
+
+        function persistFinishedSession(session) {
+            if (!session || session.diagPersisted) return;
+            session.diagPersisted = true;
+
+            const record = serializeSessionDiagnostic(session);
+            diagnosticHistory.push(record);
+            diagnosticHistory = diagnosticHistory.slice(-DIAG_MAX_SESSIONS);
+            saveDiagnosticHistory();
+            renderSavedDiagnostic(record);
+        }
+
+        function finishSession(session, options = {}) {
+            if (!session || session.finished) return;
+
+            session.finished = true;
+            clearSessionTimers(session);
+
+            addDiagEvent(session, 'SESSION_FINISH', {
+                speechStarted: session.speechStarted,
+                audioEnded: session.audioEnded,
+                serviceEnded: session.serviceEnded,
+                stopRequested: session.stopRequested,
+                stopReason: session.stopReason || '',
+                abortRequested: session.abortRequested,
+                resultHandled: session.resultHandled,
+                resultSource: session.resultSource || '',
+                candidatePoolSize: session.candidateMap.size
+            });
+
+            if (isCurrentSession(session)) {
+                activeSession = null;
+                setMicBusy(false);
+            }
+
+            if (
+                !session.cancelled &&
+                !session.resultHandled &&
+                !session.userMessageHandled &&
+                !options.keepStatus
+            ) {
+                setStatus('⏸️ 沒有收到可用的語音辨識結果，再試一次唷！', 'retry');
+            }
+
+            persistFinishedSession(session);
+            session.recognition = null;
+        }
+
+        function forceAbortSession(session, reason = 'watchdog') {
+            if (!session || session.finished || !session.recognition) return;
+
+            if (!session.abortRequested) {
+                session.abortRequested = true;
+                addDiagEvent(session, 'abort()', { reason });
+
+                try {
+                    session.recognition.abort();
+                } catch (error) {
+                    addDiagEvent(session, 'abort() threw', { message: String(error) });
+                }
+            }
+
+            clearTimeout(session.abortSettleTimer);
+            session.abortSettleTimer = setTimeout(() => {
+                if (!session.finished) {
+                    if (!session.cancelled && !session.resultHandled) {
+                        finalizeRecognitionDecision(session, `abort settle: ${reason}`);
+                    }
+                    finishSession(session, { keepStatus: true });
+                }
+            }, ABORT_SETTLE_MS);
+        }
+
+        function startHardSessionWatchdog(session) {
+            clearTimeout(session.hardLimitTimer);
+            session.hardLimitTimer = setTimeout(() => {
+                if (session.finished) return;
+
+                addDiagEvent(session, 'HARD_SESSION_LIMIT', {
+                    limitMs: HARD_SESSION_LIMIT_MS
+                });
+
+                if (!session.resultHandled && !session.cancelled) {
+                    finalizeRecognitionDecision(session, 'hard session limit');
+                }
+
+                forceAbortSession(session, 'hard session limit');
+            }, HARD_SESSION_LIMIT_MS);
+        }
+
+        function startAudioStopWatchdog(session) {
+            clearTimeout(session.audioStopWatchdogTimer);
+            session.audioStopWatchdogTimer = setTimeout(() => {
+                if (session.finished || session.audioEnded || session.serviceEnded) return;
+
+                addDiagEvent(session, 'AUDIO_STOP_WATCHDOG', {
+                    limitMs: AUDIO_STOP_WATCHDOG_MS
+                });
+
+                if (!session.resultHandled && !session.cancelled) {
+                    finalizeRecognitionDecision(session, 'audio stop watchdog');
+                }
+
+                forceAbortSession(session, 'audio stop watchdog');
+            }, AUDIO_STOP_WATCHDOG_MS);
+        }
+
+        function requestStop(session, reason = 'timer', updateMessage = true) {
+            if (
+                !session ||
+                session.finished ||
+                session.serviceEnded ||
+                !session.recognition ||
+                session.stopRequested
+            ) {
+                return;
+            }
+
+            session.stopRequested = true;
+            session.stopReason = reason;
+            clearTimeout(session.preSpeechTimer);
+            clearTimeout(session.recordingTimer);
+            clearTimeout(session.speechEndTimer);
+
+            if (updateMessage && !session.cancelled) {
+                setStatus('⏳ 已收到完整答案，正在做最後確認...');
+                setMicBusy(true, '⏳ 判斷中...');
+            }
+
+            addDiagEvent(session, 'stop()', { reason });
+
+            try {
+                session.recognition.stop();
+            } catch (error) {
+                addDiagEvent(session, 'stop() threw', { message: String(error) });
+                finalizeRecognitionDecision(session, 'stop() threw');
+                forceAbortSession(session, 'stop() threw');
+                return;
+            }
+
+            startAudioStopWatchdog(session);
+        }
+
+        function cancelActiveRecognition(reason = 'cancel', silent = false) {
+            const session = activeSession;
+            if (!session || session.finished) return;
+
+            session.cancelled = true;
+            session.userMessageHandled = true;
+            session.stopReason = reason;
+            addDiagEvent(session, 'CANCEL', { reason });
+            forceAbortSession(session, reason);
+
+            if (!silent) {
+                setStatus('⏸️ 錄音已取消。', 'retry');
             }
         }
 
         function scheduleResultWaitAfterAudioEnd(session) {
             clearTimeout(session.resultWaitTimer);
-
             session.resultWaitTimer = setTimeout(() => {
-                if (session.finished || session.resultHandled) {
-                    return;
-                }
+                if (session.finished || session.resultHandled || session.cancelled) return;
 
-                /*
-                 * audioend 代表麥克風已停止擷取，這時可以安全等待辨識服務。
-                 * 如果 5 秒後仍沒有 final，優先使用途中保存的 interim。
-                 */
-                if (useInterimFallback(session, 'audioend 後仍沒有 final result')) {
-                    forceAbortSession(session, 'interim fallback completed');
-                    return;
-                }
+                addDiagEvent(session, 'RESULT_WAIT_TIMEOUT', {
+                    waitMs: RESULT_WAIT_AFTER_AUDIO_MS
+                });
 
-                session.userMessageHandled = true;
-                setStatus('⏸️ 沒有收到語音辨識結果，再試一次唷！', 'retry');
-                forceAbortSession(session, 'result wait timeout');
+                finalizeRecognitionDecision(session, 'audioend result settle timeout');
+                forceAbortSession(session, 'result settle complete');
             }, RESULT_WAIT_AFTER_AUDIO_MS);
         }
 
         function createRecognitionSession() {
-            if (!SpeechRecognition || !currentPokemon) {
-                return null;
-            }
+            if (!SpeechRecognition || !currentPokemon) return null;
 
             const recognition = new SpeechRecognition();
             const session = {
@@ -2167,14 +2914,15 @@
                 speechEnded: false,
                 serviceEnded: false,
                 stopRequested: false,
+                stopReason: '',
                 abortRequested: false,
                 resultHandled: false,
                 finalResultHandled: false,
                 userMessageHandled: false,
                 cancelled: false,
                 finished: false,
-                bestInterim: null,
                 resultSource: '',
+                candidateMap: new Map(),
                 recordingLimitMs: getSpeechRecordingLimitMs(currentPokemon),
                 preSpeechTimer: null,
                 recordingTimer: null,
@@ -2183,36 +2931,65 @@
                 resultWaitTimer: null,
                 endGraceTimer: null,
                 hardLimitTimer: null,
-                abortSettleTimer: null
+                abortSettleTimer: null,
+                earlyDecisionTimer: null,
+                diagPersisted: false,
+                diag: {
+                    startedAt: nowIso(),
+                    mode: isReadingMode ? 'reading' : 'bopomofo',
+                    environment: getEnvironmentSnapshot(),
+                    recognitionConfig: {},
+                    rawResultEvents: [],
+                    evaluations: [],
+                    events: [],
+                    decision: null,
+                    diagnosticCategory: '',
+                    finalizeReason: '',
+                    lastError: ''
+                }
             };
 
             recognition.lang = 'zh-TW';
-
-            /*
-             * V13 延續 interimResults。
-             * 這不會直接把暫存結果判成答案；只有 final 缺席時才作為救援。
-             */
             recognition.interimResults = true;
             recognition.maxAlternatives = MAX_ALTERNATIVES;
-            recognition.continuous = false;
+
+            /*
+             * V16 保留 continuous=true：
+             * continuous=true 讓慢速分段講話有機會繼續產生下一段結果。
+             * 若瀏覽器實作不完整，事件紀錄也會把異常完整留下。
+             */
+            recognition.continuous = true;
+
+            session.diag.recognitionConfig = {
+                lang: recognition.lang,
+                interimResults: recognition.interimResults,
+                maxAlternatives: recognition.maxAlternatives,
+                continuous: recognition.continuous,
+                waitForSpeechMs: WAIT_FOR_SPEECH_MS,
+                speechEndGraceMs: SPEECH_END_GRACE_MS,
+                recordingLimitMs: session.recordingLimitMs,
+                hardSessionLimitMs: HARD_SESSION_LIMIT_MS,
+                fastFinalConfirmMs: FAST_FINAL_CONFIRM_MS,
+                finalBelowThresholdSettleMs: FINAL_BELOW_THRESHOLD_SETTLE_MS
+            };
 
             recognition.onstart = () => {
                 if (!isCurrentSession(session) || session.cancelled) return;
 
                 session.started = true;
-                logLifecycle(session, 'start');
+                addDiagEvent(session, 'start', {
+                    continuous: recognition.continuous,
+                    lang: recognition.lang
+                });
 
-                setStatus('👂 麥克風已開啟，準備好再開始說話');
+                setStatus('👂 麥克風已開啟，請正常把完整答案說完');
                 setMicBusy(true, '⏹️ 錄音中...');
 
-                /*
-                 * V2 從這一刻就開始算 4 秒。
-                 * V13 仍只負責等待 speechstart，最多等待 7 秒。
-                 */
                 clearTimeout(session.preSpeechTimer);
                 session.preSpeechTimer = setTimeout(() => {
                     if (!session.speechStarted && !session.finished) {
                         session.userMessageHandled = true;
+                        session.diag.diagnosticCategory = 'NO_SPEECH_DETECTED';
                         setStatus('👂 還沒有聽到說話聲，再試一次唷！', 'retry');
                         requestStop(session, '等待說話逾時', false);
                     }
@@ -2223,156 +3000,136 @@
 
             recognition.onaudiostart = () => {
                 session.audioStarted = true;
-                logLifecycle(session, 'audiostart');
+                addDiagEvent(session, 'audiostart');
             };
 
             recognition.onsoundstart = () => {
-                logLifecycle(session, 'soundstart');
-                /* 如果 Safari 又偵測到聲音，先取消「講完」倒數。 */
+                addDiagEvent(session, 'soundstart');
                 clearTimeout(session.speechEndTimer);
             };
 
+            recognition.onsoundend = () => {
+                addDiagEvent(session, 'soundend');
+            };
+
             recognition.onspeechstart = () => {
+                const firstSpeechStart = !session.speechStarted;
                 session.speechStarted = true;
                 session.speechEnded = false;
-                logLifecycle(session, 'speechstart');
+                addDiagEvent(session, 'speechstart', { firstSpeechStart });
 
                 clearTimeout(session.preSpeechTimer);
                 clearTimeout(session.speechEndTimer);
 
-                /*
-                 * 真正聽到孩子開始說話後才啟動上限，且依題目音節數調整。
-                 * speechend 若先發生，會用短暫靜音緩衝提早送出。
-                 */
-                clearTimeout(session.recordingTimer);
-                session.recordingTimer = setTimeout(() => {
-                    requestStop(
-                        session,
-                        `speechstart 後 ${session.recordingLimitMs}ms 上限`,
-                        true
-                    );
-                }, session.recordingLimitMs);
+                /* 只在第一次真正說話時啟動整題最大說話時間。 */
+                if (firstSpeechStart) {
+                    clearTimeout(session.recordingTimer);
+                    session.recordingTimer = setTimeout(() => {
+                        requestStop(
+                            session,
+                            `speechstart 後 ${session.recordingLimitMs}ms 最大收音窗`,
+                            true
+                        );
+                    }, session.recordingLimitMs);
+                }
 
                 if (isCurrentSession(session) && !session.cancelled) {
-                    setStatus('🎙️ 收到聲音了，請把答案說完');
+                    setStatus('🎙️ 正在收音，請把完整答案說完');
                 }
             };
 
             recognition.onspeechend = () => {
                 session.speechEnded = true;
-                logLifecycle(session, 'speechend');
+                addDiagEvent(session, 'speechend', {
+                    quietGraceMs: SPEECH_END_GRACE_MS
+                });
 
-                if (
-                    isCurrentSession(session) &&
-                    !session.cancelled &&
-                    !session.resultHandled
-                ) {
-                    setStatus('⏳ 好像說完了，正在準備辨識...');
+                if (isCurrentSession(session) && !session.cancelled) {
+                    setStatus(`⏳ 偵測到停頓，保留 ${SPEECH_END_GRACE_MS / 1000} 秒等待後續語音...`);
                 }
 
                 /*
-                 * V13：講完後不用硬等到最大秒數。
-                 * 但保留 1.1 秒緩衝，避免孩子字與字之間稍微停頓就被切斷。
+                 * V16：靜音窗縮短為 1.5 秒。
+                 * 若期間 Safari 又送 soundstart / speechstart，倒數仍會被取消。
                  */
                 clearTimeout(session.speechEndTimer);
                 session.speechEndTimer = setTimeout(() => {
-                    if (
-                        !session.finished &&
-                        !session.resultHandled &&
-                        !session.cancelled
-                    ) {
-                        requestStop(session, 'speechend 靜音緩衝結束', true);
+                    if (!session.finished && !session.cancelled && !session.stopRequested) {
+                        requestStop(session, 'speechend 後靜音窗結束', true);
                     }
                 }, SPEECH_END_GRACE_MS);
             };
 
-            recognition.onsoundend = () => {
-                logLifecycle(session, 'soundend');
-            };
-
             recognition.onaudioend = () => {
                 session.audioEnded = true;
-                logLifecycle(session, 'audioend');
+                addDiagEvent(session, 'audioend');
 
                 clearTimeout(session.audioStopWatchdogTimer);
                 clearTimeout(session.preSpeechTimer);
                 clearTimeout(session.recordingTimer);
                 clearTimeout(session.speechEndTimer);
 
-                /*
-                 * 到這裡代表瀏覽器已停止擷取麥克風。
-                 * 不急著 abort，讓 Safari 有最多 5 秒把 final result 送回來。
-                 */
-                if (!session.resultHandled) {
-                    setStatus('⏳ 收音完成，正在辨識答案...');
+                if (!session.resultHandled && !session.cancelled) {
+                    setStatus('⏳ 收音完成，正在做最後確認...');
                     scheduleResultWaitAfterAudioEnd(session);
                 }
             };
 
             recognition.onresult = event => {
-                const hasFinal = Array.from(event.results || []).some(result => result && result.isFinal);
-                logLifecycle(session, hasFinal ? 'result(final)' : 'result(interim)');
-                processRecognitionResult(session, event);
-            };
+                /*
+                 * 每次有新結果，先取消前一次的早停倒數。
+                 * 代表瀏覽器還在更新辨識內容，應以最新候選重新評估。
+                 */
+                clearTimeout(session.earlyDecisionTimer);
 
-            recognition.onnomatch = () => {
-                logLifecycle(session, 'nomatch');
-
-                if (!isCurrentSession(session) || session.cancelled) return;
-
-                /* 如果之前曾有 interim，先讓它救援。 */
-                if (useInterimFallback(session, 'nomatch')) {
-                    requestStop(session, 'nomatch + interim fallback', false);
-                    return;
-                }
-
-                session.userMessageHandled = true;
-                setStatus('🤔 沒有聽清楚，再試一次唷！', 'retry');
-                requestStop(session, 'nomatch', false);
-            };
-
-            recognition.onerror = event => {
-                const errorName = event && event.error ? event.error : 'unknown';
-                logLifecycle(session, 'error', errorName);
+                captureRecognitionResult(session, event);
 
                 if (!isCurrentSession(session) || session.cancelled) {
                     return;
                 }
 
-                /* 我們自己 abort 造成的 aborted，不覆蓋原本答題結果。 */
-                if (errorName === 'aborted' && session.abortRequested) {
-                    return;
-                }
+                considerFastDecision(session);
 
-                if (session.resultHandled) {
-                    return;
+                if (!session.resultHandled && !session.stopRequested) {
+                    setStatus('🎙️ 已收到辨識結果，正在確認是否可以立即判斷...');
                 }
+            };
 
-                /* 某些 Safari 錯誤前可能已經送過 interim，可先救援。 */
+            recognition.onnomatch = () => {
+                addDiagEvent(session, 'nomatch');
+                if (!isCurrentSession(session) || session.cancelled) return;
+
+                session.diag.diagnosticCategory = 'BROWSER_NOMATCH';
+                requestStop(session, 'nomatch', true);
+            };
+
+            recognition.onerror = event => {
+                const errorName = event && event.error ? event.error : 'unknown';
+                session.diag.lastError = errorName;
+                addDiagEvent(session, 'error', {
+                    error: errorName,
+                    message: event && event.message ? event.message : ''
+                });
+
+                if (!isCurrentSession(session) || session.cancelled) return;
+                if (errorName === 'aborted' && session.abortRequested) return;
+
                 if (
-                    errorName !== 'not-allowed' &&
-                    errorName !== 'service-not-allowed' &&
-                    useInterimFallback(session, `error: ${errorName}`)
-                ) {
-                    forceAbortSession(session, `error after interim: ${errorName}`);
-                    return;
-                }
-
-                session.userMessageHandled = true;
-
-                if (errorName === 'no-speech') {
-                    setStatus('👂 好像沒有聽到聲音，再試一次唷！', 'retry');
-                } else if (
                     errorName === 'not-allowed' ||
                     errorName === 'service-not-allowed'
                 ) {
+                    session.userMessageHandled = true;
                     setStatus('🎤 請允許瀏覽器使用麥克風後再試一次。', 'error');
                 } else if (errorName === 'audio-capture') {
+                    session.userMessageHandled = true;
                     setStatus('🎤 找不到可用的麥克風，請檢查裝置設定。', 'error');
                 } else if (errorName === 'network') {
-                    setStatus('🌐 語音服務連線失敗，請確認網路後再試一次。', 'error');
-                } else if (errorName !== 'aborted') {
-                    setStatus('❌ 收音沒有成功，請再試一次。', 'error');
+                    session.userMessageHandled = true;
+                    setStatus('🌐 語音服務連線失敗。這次診斷紀錄會保留下來。', 'error');
+                }
+
+                if (!session.resultHandled && session.candidateMap.size) {
+                    finalizeRecognitionDecision(session, `error: ${errorName}`);
                 }
 
                 if (errorName !== 'aborted') {
@@ -2382,7 +3139,7 @@
 
             recognition.onend = () => {
                 session.serviceEnded = true;
-                logLifecycle(session, 'end');
+                addDiagEvent(session, 'end');
 
                 clearTimeout(session.audioStopWatchdogTimer);
                 clearTimeout(session.resultWaitTimer);
@@ -2395,29 +3152,21 @@
                     return;
                 }
 
-                if (session.resultHandled || session.cancelled) {
+                if (session.cancelled) {
                     finishSession(session, { keepStatus: true });
                     return;
                 }
 
                 /*
-                 * Safari 偶爾事件時序不漂亮；end 後先留 1.2 秒，
-                 * 若仍沒有 final，再使用 interim 或顯示「沒有收到結果」。
+                 * Safari 偶爾 onend 與最後 result 的順序會很接近。
+                 * 再保留短暫 settle window，之後才做「整個 session」最終判斷。
                  */
                 clearTimeout(session.endGraceTimer);
                 session.endGraceTimer = setTimeout(() => {
-                    if (session.finished || session.resultHandled) {
-                        return;
-                    }
+                    if (session.finished) return;
 
-                    if (useInterimFallback(session, 'end 後沒有 final result')) {
-                        finishSession(session, { keepStatus: true });
-                        return;
-                    }
-
-                    if (!session.userMessageHandled) {
-                        session.userMessageHandled = true;
-                        setStatus('⏸️ 沒有收到語音辨識結果，再試一次唷！', 'retry');
+                    if (!session.resultHandled) {
+                        finalizeRecognitionDecision(session, 'recognition onend settle');
                     }
 
                     finishSession(session, { keepStatus: true });
@@ -2428,13 +3177,19 @@
         }
 
         function startRecognition() {
-            if (!SpeechRecognition || !currentPokemon) {
+            if (!SpeechRecognition || !currentPokemon) return;
+
+            if (typeof pinyinFn !== 'function') {
+                setStatus(
+                    '❌ 注音判分模組目前不可用，已停止本次錄音，避免誤判。',
+                    'error'
+                );
+                micBtn.disabled = true;
+                micBtn.textContent = '⚠️ 判分模組未載入';
                 return;
             }
 
-            if (activeSession && !activeSession.finished) {
-                return;
-            }
+            if (activeSession && !activeSession.finished) return;
 
             const session = createRecognitionSession();
             if (!session) return;
@@ -2443,25 +3198,79 @@
             setStatus('🎤 麥克風準備中...');
             setMicBusy(true, '🎤 準備中...');
 
-            console.groupCollapsed(`🎙️ 建立 Speech Session #${session.id}`);
-            console.log('題目：', session.targetPokemon.name);
-            console.log('標準注音：', getTargetZhuyin(session.targetPokemon).join(' / '));
-            console.log('maxAlternatives：', MAX_ALTERNATIVES);
-            console.log('實際發音音節數：', getPronounceableSyllableCount(session.targetPokemon));
-            console.log('等待開始說話：', `${WAIT_FOR_SPEECH_MS}ms`);
-            console.log('本題 speechstart 後最大時間：', `${session.recordingLimitMs}ms`);
-            console.log('speechend 靜音緩衝：', `${SPEECH_END_GRACE_MS}ms`);
-            console.groupEnd();
+            addDiagEvent(session, 'SESSION_CREATE', {
+                target: session.targetPokemon.name,
+                targetZhuyin: getTargetZhuyin(session.targetPokemon),
+                pinyinProLoaded: Boolean(pinyinFn),
+                recognitionConfig: session.diag.recognitionConfig
+            });
+
+            renderLiveDiagnostic(session);
 
             try {
                 session.recognition.start();
             } catch (error) {
-                console.warn(`[Speech #${session.id}] start() 失敗：`, error);
+                session.diag.lastError = 'start-threw';
+                addDiagEvent(session, 'start() threw', {
+                    message: String(error)
+                });
                 session.userMessageHandled = true;
                 setStatus('🎤 麥克風還沒準備好，請再按一次。', 'retry');
                 finishSession(session, { keepStatus: true });
             }
         }
+
+        async function copyDiagnosticText(textToCopy, successMessage) {
+            if (!textToCopy) return;
+
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(textToCopy);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = textToCopy;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    document.execCommand('copy');
+                    textarea.remove();
+                }
+                setStatus(successMessage || '📋 已複製語音診斷紀錄。', 'success');
+            } catch (error) {
+                console.warn('複製診斷紀錄失敗：', error);
+                setStatus('📋 無法自動複製，請直接選取診斷區文字。', 'retry');
+            }
+        }
+
+        copyLatestDiagBtn.addEventListener('click', () => {
+            const latest = diagnosticHistory[diagnosticHistory.length - 1];
+            copyDiagnosticText(
+                formatDiagnosticRecord(latest),
+                '📋 已複製最新一題的完整語音紀錄。'
+            );
+        });
+
+        copyAllDiagBtn.addEventListener('click', () => {
+            const allText = diagnosticHistory.length
+                ? diagnosticHistory.map(formatDiagnosticRecord).join('\n\n\n')
+                : '尚無語音診斷紀錄。';
+            copyDiagnosticText(
+                allText,
+                `📋 已複製 ${diagnosticHistory.length} 筆語音診斷紀錄。`
+            );
+        });
+
+        clearDiagBtn.addEventListener('click', () => {
+            diagnosticHistory = [];
+            saveDiagnosticHistory();
+            renderSavedDiagnostic(null);
+            setStatus('🧹 語音診斷紀錄已清除。');
+        });
+
+        /* 重新整理頁面後仍顯示上一次測試。 */
+        renderSavedDiagnostic(diagnosticHistory[diagnosticHistory.length - 1] || null);
 
         /* =========================================================
          * 按鈕
