@@ -2,14 +2,14 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="寶可夢挑戰">
     <meta name="theme-color" content="#f4f6fb">
     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="./icon-192.png">
-    <title>寶可夢拼音/認字挑戰</title>
+    <title>寶可夢拼音/認字挑戰 V17</title>
     <style>
         * {
             box-sizing: border-box;
@@ -402,6 +402,64 @@
             pointer-events: none;
             z-index: 999;
         }
+        /* V17: use one viewport, additive safe-area padding and three layout rows. */
+        html { height: 100%; overflow: auto; }
+        body {
+            height: 100%; height: 100dvh; min-height: 0;
+            overflow: auto; align-items: stretch;
+            padding: calc(env(safe-area-inset-top, 0px) + 12px)
+                     calc(env(safe-area-inset-right, 0px) + 14px)
+                     calc(env(safe-area-inset-bottom, 0px) + 12px)
+                     calc(env(safe-area-inset-left, 0px) + 14px);
+        }
+        .game-shell { display: grid; grid-template-columns: minmax(0,1fr); justify-content: stretch; grid-template-rows: auto minmax(0, 1fr) auto; gap: 12px; height: 100%; min-height: 0; align-items: stretch; }
+        .header-bar { gap: 6px; padding: 2px 0; }
+        .app-badges { gap: 6px; min-width: 0; }
+        .badge-pill { padding: 7px 10px; font-size: clamp(13px, 3.5vw, 18px); }
+        .badge-pill.star { font-family: inherit; min-height: 36px; touch-action: manipulation; }
+        .star-svg { width: 19px; height: 19px; flex: none; display: block; }
+        #modeBtn { padding: 7px 11px; font-size: clamp(13px, 3.5vw, 18px); white-space: normal; line-height: 1.3; }
+        .stage-area { display: grid; grid-template-columns: minmax(0, 1fr); justify-content: stretch; grid-template-rows: minmax(0, 1fr) auto; gap: 14px; padding: 4px 0 8px; align-items: center; justify-items: center; }
+        .card-slot { width: 100%; height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(0,1fr); place-items: center; padding: 8px 0; }
+        .card-container { height: 100%; max-height: 380px; width: auto; aspect-ratio: 7 / 10; max-width: 76vw; min-height: 0; }
+        .card:not(.is-animating) { transform: none; transform-style: flat; transition: none; }
+        .card:not(.is-animating) .card-front { transform: none; display: none; }
+        .card.flipped:not(.is-animating) .card-front { display: flex; }
+        .card.flipped:not(.is-animating) .card-back { display: none; }
+        .card.is-animating { -webkit-transform-style: preserve-3d; transform-style: preserve-3d; }
+        .ball-svg { display: block; width: 56%; max-width: 145px; height: auto; }
+        .card-front img { width: 100%; height: 100%; object-fit: contain; }
+        .word-card { padding: 12px 12px 10px; width: 100%; min-width: 0; max-width: none; container-type: inline-size; }
+        .bopomofo-display { --name-scale: 1; gap: calc(clamp(8px, 2.8vw, 22px) * var(--name-scale)); gap: calc(clamp(8px, 3cqw, 22px) * var(--name-scale)); min-height: 86px; padding: 9px 6px; }
+        .char-text { font-size: calc(clamp(36px, 10vw, 64px) * var(--name-scale)); font-size: calc(clamp(30px, 10cqw, 64px) * var(--name-scale)); }
+        .zhuyin-col { font-size: calc(clamp(18px, 5vw, 28px) * var(--name-scale)); font-size: calc(clamp(16px, 5cqw, 28px) * var(--name-scale)); }
+        #statusMessage { min-height: 2.7em; display: grid; place-items: center; font-size: clamp(15px, 4.2vw, 21px); overflow-wrap: anywhere; }
+        .controls { align-self: end; }
+        #modeBtn:disabled { opacity: .65; cursor: not-allowed; }
+        @media (max-height: 670px) and (orientation: portrait) {
+            .game-shell { gap: 6px; } .stage-area { gap: 6px; padding: 0; }
+            .word-card { padding: 6px; } .bopomofo-display { min-height: 65px; padding: 6px; }
+            #micBtn { min-height: 52px; } button.action-btn { min-height: 46px; padding: 8px; }
+        }
+        @media (min-width: 768px) and (max-height: 850px) and (orientation: landscape) {
+            .stage-area { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); grid-template-rows: minmax(0,1fr); gap: 18px; }
+        }
+        @media (max-height: 540px) and (orientation: landscape) {
+            .game-shell { min-height: 300px; gap: 5px; }
+            .stage-area { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); grid-template-rows: minmax(0,1fr); gap: 12px; }
+            .word-card { width: 100%; min-width: 0; padding: 6px; }
+            .bopomofo-display { min-height: 50px; padding: 5px; gap: 8px; }
+            .char-text { font-size: calc(clamp(28px, 6vw, 44px) * var(--name-scale)); }
+            .zhuyin-col { font-size: calc(19px * var(--name-scale)); }
+            .controls { grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
+            #micBtn { grid-column: auto; min-height: 46px; } button.action-btn { min-height: 44px; padding: 6px; }
+        }
+        @media (max-height: 470px) and (orientation: portrait) { .game-shell { min-height: 450px; } }
+        @media (prefers-reduced-motion: reduce) { .card { transition: none; } button { transition: none !important; } }
+        #parentPanel { position: fixed; inset: auto max(12px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom, 0px) + 12px) max(12px, env(safe-area-inset-left)); z-index: 1001; max-width: 650px; margin: auto; background: white; border: 1px solid #cbd5e1; border-radius: 16px; padding: 14px; box-shadow: 0 10px 36px #17203340; max-height: 75dvh; overflow: auto; user-select: text; -webkit-user-select: text; }
+        #parentPanel[hidden] { display: none; }
+        #parentPanel pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; max-height: 32dvh; overflow: auto; user-select: text; -webkit-user-select: text; }
+        #parentPanel button, #parentPanel select { font: inherit; padding: 9px; margin: 4px; }
     </style>
 </head>
 <body>
@@ -410,17 +468,17 @@
     <main class="game-shell">
         <div class="header-bar">
             <div class="app-badges">
-                <div class="badge-pill star">⭐ <span id="starCount">0</span></div>
+                <button type="button" class="badge-pill star" id="parentTrigger" aria-label="星星計分；長按三秒開啟家長設定"><svg class="star-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5l3.2 6.6 7.3 1.1-5.3 5.2 1.3 7.3-6.5-3.5-6.5 3.5 1.3-7.3L1.5 9.2l7.3-1.1z" fill="#facc15" stroke="#b77908" stroke-width="1.2" stroke-linejoin="round"/></svg><span id="starCount">0</span></button>
                 <div class="badge-pill">第 <span id="questionNum">1</span> 題</div>
             </div>
             <button id="modeBtn" type="button">切換為：認字模式</button>
         </div>
 
         <div class="stage-area">
-            <div class="card-container">
+            <div class="card-slot"><div class="card-container">
                 <div class="card" id="pokemonCard">
                     <div class="card-face card-back">
-                        <div class="pokeball"></div>
+                        <svg class="ball-svg" viewBox="0 0 120 120" role="img" aria-label="寶可夢球"><circle cx="60" cy="60" r="51" fill="#fff"/><path d="M9 60a51 51 0 0 1 102 0Z" fill="#dc2635"/><path d="M20 37Q34 17 52 16" fill="none" stroke="#ff9097" stroke-width="5" stroke-linecap="round"/><circle cx="60" cy="60" r="51" fill="none" stroke="#17212b" stroke-width="6"/><path d="M9 60h102" stroke="#17212b" stroke-width="8"/><circle cx="60" cy="60" r="17" fill="#fff" stroke="#17212b" stroke-width="6"/><circle cx="60" cy="60" r="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/></svg>
                     </div>
                     <div class="card-face card-front">
                         <img id="pokemonImage" src="" alt="Pokemon" decoding="async" fetchpriority="high">
@@ -428,9 +486,10 @@
                 </div>
             </div>
 
+            </div>
             <div class="word-card">
                 <div class="bopomofo-display" id="bopomofoText"></div>
-                <div id="statusMessage">準備好了嗎？</div>
+                <div id="statusMessage" role="status" aria-live="polite">準備好了嗎？</div>
             </div>
         </div>
 
@@ -441,6 +500,13 @@
         </div>
     </main>
 
+    <aside id="parentPanel" hidden aria-label="家長設定">
+        <strong>V17 家長診斷</strong>
+        <p>僅記錄本次開啟期間的事件與時間；不保存錄音、辨識文字或兒童作答歷史。</p>
+        <label>收音策略 <select id="voiceMode"><option value="auto">自動（建議）</option><option value="compat">相容／自然結束</option><option value="fast">快速／連續收音</option></select></label>
+        <button id="copyEvents" type="button">複製事件</button><button id="clearEvents" type="button">清除</button><button id="closeParent" type="button">關閉</button>
+        <pre id="eventOutput"></pre>
+    </aside>
     <script src="dataset.js"></script>
     <script>
         /* =========================================================
@@ -448,7 +514,7 @@
          * ========================================================= */
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch((err) => {
+                navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch((err) => {
                     console.warn('[PWA] Service Worker 註冊略過:', err);
                 });
             });
@@ -474,54 +540,36 @@
             }
         }
 
+        let confettiFrame = 0;
+        function stopConfetti() {
+            cancelAnimationFrame(confettiFrame); confettiFrame = 0;
+            const c = document.getElementById('confettiCanvas');
+            const ctx = c.getContext('2d');
+            if (ctx) { ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,c.width,c.height); }
+        }
         function launchConfetti() {
-            const canvas = document.getElementById('confettiCanvas');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-
-            const colors = ['#ffcc00', '#ff5252', '#4caf50', '#2196f3', '#ab47bc', '#ff9800'];
-            const pieces = Array.from({ length: 55 }, () => ({
-                x: canvas.width * (0.2 + Math.random() * 0.6),
-                y: canvas.height * 0.35,
-                vx: (Math.random() - 0.5) * 12,
-                vy: -Math.random() * 10 - 4,
-                size: Math.random() * 8 + 6,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                rot: Math.random() * 360,
-                vRot: (Math.random() - 0.5) * 14
-            }));
-
-            let frame = 0;
-            function draw() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                pieces.forEach(p => {
-                    p.x += p.vx;
-                    p.y += p.vy;
-                    p.vy += 0.42; // 重力
-                    p.rot += p.vRot;
-
-                    ctx.save();
-                    ctx.translate(p.x, p.y);
-                    ctx.rotate((p.rot * Math.PI) / 180);
-                    ctx.fillStyle = p.color;
-                    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
-                    ctx.restore();
-                });
-
-                frame++;
-                if (frame < 75) {
-                    requestAnimationFrame(draw);
-                } else {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                }
+            stopConfetti();
+            if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            const c = document.getElementById('confettiCanvas'), ctx = c.getContext('2d');
+            if (!ctx) return;
+            const w = c.clientWidth, h = c.clientHeight, dpr = Math.min(devicePixelRatio || 1, 3);
+            c.width = Math.round(w*dpr); c.height = Math.round(h*dpr); ctx.setTransform(dpr,0,0,dpr,0,0);
+            const colors = ['#ffcc00','#ff5252','#4caf50','#2196f3','#ab47bc'];
+            const pieces = Array.from({length: 48}, () => ({x:w*(.2+Math.random()*.6),y:h*.35,vx:(Math.random()-.5)*12,vy:-Math.random()*10-4,size:6+Math.random()*8,rot:Math.random()*6,vr:(Math.random()-.5)*.25,color:colors[Math.floor(Math.random()*colors.length)]}));
+            const start = performance.now(); let last = start;
+            function draw(now) {
+                if (document.hidden || now-start > 1250) { stopConfetti(); return; }
+                const dt = Math.min((now-last)/16.67, 2); last=now;
+                ctx.clearRect(0,0,w,h);
+                for (const p of pieces) { p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=.42*dt; p.rot+=p.vr*dt;
+                    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillStyle=p.color; ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*.6); ctx.restore(); }
+                confettiFrame=requestAnimationFrame(draw);
             }
-            requestAnimationFrame(draw);
+            confettiFrame=requestAnimationFrame(draw);
         }
 
         /* =========================================================
-         * 寶可夢拼音 / 認字挑戰 V16 - Production（原始核心邏輯完全保留）
+         * 寶可夢拼音 / 認字挑戰 V17 Universal Stable（保留 V16 判分核心）
          * ========================================================= */
 
         let currentPokemon = null;
@@ -530,7 +578,33 @@
 
         let pinyinLoadSource = 'NOT_LOADED';
         let isChangingQuestion = false;
-        let pendingMicStart = false;
+        let cardAnimating = false;
+        let pinyinHealthy = false;
+        let initialized = false;
+        let cooldownUntil = 0;
+        let cooldownTimer = null;
+        let strategyPreference = 'auto';
+        let autoCompat = false;
+        let consecutiveFaults = 0;
+        const appleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+        const START_TIMEOUT_MS = 8000;
+        const AUDIO_START_TIMEOUT_MS = 3500;
+        const NO_RESULT_MS = 5500;
+        const RELEASE_TIMEOUT_MS = 2200;
+        const IOS_RELEASE_COOLDOWN_MS = 450;
+        const HARD_LIMIT_MS = 22000;
+        const events = [];
+        const parentPanel = document.getElementById('parentPanel');
+        function trace(session, event, detail = '') {
+            events.push(`${new Date().toISOString()} ${session ? '#'+session.id+' +'+Math.round(performance.now()-session.createdAt)+'ms' : 'APP'} ${event}${detail ? ' '+detail : ''}`);
+            if(events.length>240) events.shift();
+            if(!parentPanel.hidden) renderEvents();
+        }
+        function renderEvents() {
+            document.getElementById('eventOutput').textContent = `V17 | ${appleMobile?'Apple mobile':'Other'} | standalone=${standalone} | mode=${chooseStrategy()} | pinyin=${pinyinHealthy?'OK':'not ready'}\n${navigator.userAgent}\n`+events.join('\n');
+        }
+        function chooseStrategy() { return strategyPreference==='auto' ? (appleMobile||autoCompat?'compat':'fast') : strategyPreference; }
 
         const SCORE_CORRECT = 90;
         const SCORE_CLOSE = 75;
@@ -542,7 +616,6 @@
         const END_RESULT_GRACE_MS = 400;
         const FAST_FINAL_CONFIRM_MS = 250;
         const FINAL_BELOW_THRESHOLD_SETTLE_MS = 900;
-        const HARD_SESSION_LIMIT_MS = 26000;
         const ABORT_SETTLE_MS = 900;
         const MAX_ALTERNATIVES = 5;
         const MAX_UTTERANCE_CANDIDATES = 15;
@@ -576,7 +649,7 @@
         }
 
         function setMicBusy(isBusy, text = '') {
-            micBtn.disabled = isBusy;
+            micBtn.disabled = isBusy || !initialized || !pinyinHealthy;
             micBtn.textContent = text || (isBusy ? '⏹️ 錄音中...' : '🎤 按下說話');
             micBtn.style.backgroundColor = isBusy ? '#f44336' : '#4CAF50';
             micBtn.setAttribute('aria-pressed', isBusy ? 'true' : 'false');
@@ -685,8 +758,9 @@
         function registerPinyinFromGlobal(sourceLabel) {
             if (window.pinyinPro && typeof window.pinyinPro.pinyin === 'function') {
                 pinyinFn = window.pinyinPro.pinyin;
-                pinyinLoadSource = sourceLabel;
-                return true;
+                if (testPinyinEngine().ok) { pinyinLoadSource = sourceLabel; return true; }
+                pinyinFn = null;
+                return false;
             }
             return false;
         }
@@ -708,7 +782,7 @@
                     script.onload = null;
                     script.onerror = null;
                     if (ok) resolve(true);
-                    else reject(error || new Error(`${sourceLabel} failed`));
+                    else { script.remove(); reject(error || new Error(`${sourceLabel} failed`)); }
                 };
 
                 const timer = setTimeout(() => {
@@ -739,6 +813,7 @@
             if (registerPinyinFromGlobal('preloaded')) return true;
 
             const classicSources = [
+                { label: 'local library', url: './libs/pinyin-pro.js' },
                 {
                     label: 'jsDelivr index.js',
                     url: 'https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.js'
@@ -762,17 +837,7 @@
                 }
             }
 
-            try {
-                const esmUrl = 'https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.mjs';
-                const module = await import(esmUrl);
-                if (module && typeof module.pinyin === 'function') {
-                    pinyinFn = module.pinyin;
-                    pinyinLoadSource = 'jsDelivr ESM';
-                    return true;
-                }
-            } catch (error) {
-                console.warn('[pinyin-pro] ESM fallback 載入失敗：', error);
-            }
+
 
             pinyinLoadSource = 'FAILED_ALL_SOURCES';
             return false;
@@ -785,48 +850,27 @@
             try {
                 const test = pinyinFn('皮卡丘', { toneType: 'none', type: 'array' });
                 const result = Array.isArray(test) ? test.join(' ') : String(test || '');
-                return { ok: Boolean(result), result };
+                return { ok: result === 'pi ka qiu' && recognizedTextToZhuyin('皮卡丘').join('/') === 'ㄆㄧ/ㄎㄚ/ㄑㄧㄡ', result };
             } catch (error) {
                 return { ok: false, reason: error && error.message ? error.message : String(error) };
             }
         }
 
         window.addEventListener('load', async () => {
-            micBtn.disabled = true;
-            micBtn.textContent = '⏳ 初始化語音判分...';
-            setStatus('⏳ 正在載入注音判分模組...');
-
-            const pinyinReady = await ensurePinyinProLoaded();
-            const pinyinHealth = testPinyinEngine();
-
-            if (typeof pokemonDB !== 'undefined' && pokemonDB.length > 0) {
-                validateDataset();
-                refillQuestionBag();
-                loadRandomPokemon();
-            } else {
-                setStatus('⏳ 找不到題庫，請確認 dataset.js 是否正確載入。', 'error');
+            refreshControls();
+            if (typeof pokemonDB !== 'undefined' && Array.isArray(pokemonDB) && pokemonDB.length) {
+                validateDataset(); refillQuestionBag(); loadRandomPokemon();
             }
-
-            if (!SpeechRecognition) {
-                setStatus('⚠️ 目前瀏覽器不支援語音辨識，請改用支援的瀏覽器。', 'error');
-                micBtn.disabled = true;
-                micBtn.textContent = '🎤 不支援語音辨識';
-                return;
-            }
-
-            if (!pinyinReady || !pinyinHealth.ok) {
-                setStatus('❌ 注音判分模組載入失敗。為避免把正確的同音答案誤判成 0 分，語音作答已暫停。請重新整理頁面後再試一次。', 'error');
-                micBtn.disabled = true;
-                micBtn.textContent = '⚠️ 判分模組未載入';
-                return;
-            }
-
-            micBtn.disabled = false;
-            micBtn.textContent = '🎤 按下說話';
-
-            if (currentPokemon) {
-                setStatus(isReadingMode ? '請唸出上面的國字' : '請拼出上面的注音');
-            }
+            setStatus('正在載入注音判分模組...');
+            try { pinyinHealthy = await ensurePinyinProLoaded() && testPinyinEngine().ok; }
+            catch (error) { console.warn('[pinyin]', error); }
+            initialized = true;
+            trace(null, 'READY', `pinyin=${pinyinHealthy} source=${pinyinLoadSource}`);
+            if (!currentPokemon) setStatus('找不到題庫，請確認 dataset.js。','error');
+            else if (!SpeechRecognition) setStatus('此瀏覽器不支援語音辨識，仍可查看答案。','error');
+            else if (!pinyinHealthy) setStatus('注音判分模組未載入，請檢查網路並重新開啟。','error');
+            else if(!card.classList.contains('flipped')) showQuestionPrompt();
+            refreshControls();
         });
 
         function generateZhuyinHTML(name, zhuyinArray) {
@@ -890,81 +934,45 @@
             return html;
         }
 
+        function showQuestionPrompt() {
+            if (!pinyinHealthy && initialized) { setStatus('注音判分模組未就緒，仍可查看答案。','error'); return; }
+            if (!SpeechRecognition) { setStatus('此瀏覽器不支援語音辨識。','error'); return; }
+            setStatus(isReadingMode ? '請唸出上面的國字' : '請拼出上面的注音');
+        }
+        function animateCard(flipped, done = () => {}) {
+            if (cardAnimating || card.classList.contains('flipped') === flipped) { done(); return; }
+            cardAnimating = true; refreshControls();
+            let timer, ended=false;
+            const finish = () => {
+                if (ended) return; ended=true; clearTimeout(timer);
+                card.removeEventListener('transitionend', onEnd);
+                card.classList.remove('is-animating'); card.style.transition='';
+                cardAnimating=false; done(); refreshControls();
+            };
+            const onEnd = e => { if(e.target===card && e.propertyName==='transform') finish(); };
+            if(matchMedia('(prefers-reduced-motion: reduce)').matches) { card.classList.toggle('flipped',flipped); finish(); return; }
+            card.style.transition='none'; card.classList.add('is-animating');
+            void card.offsetWidth; card.style.transition=''; void card.offsetWidth;
+            card.addEventListener('transitionend',onEnd);
+            card.classList.toggle('flipped',flipped); timer=setTimeout(finish,950);
+        }
         function revealAnswer() {
-            card.classList.add('flipped');
-            bopomofoText.classList.remove('hide-zhuyin');
+            bopomofoText.classList.remove('hide-zhuyin'); animateCard(true);
         }
-
         function applyPokemonQuestion(nextPokemon) {
-            currentPokemon = nextPokemon;
-            updateAppCounters({ incrementQuestion: true });
-
-            if (isReadingMode) {
-                bopomofoText.classList.add('hide-zhuyin');
-                setStatus('請唸出上面的國字');
-            } else {
-                bopomofoText.classList.remove('hide-zhuyin');
-                setStatus('請拼出上面的注音');
-            }
-
-            bopomofoText.innerHTML = generateZhuyinHTML(
-                currentPokemon.name,
-                currentPokemon.zhuyin
-            );
-
-            pokemonImage.src = currentPokemon.image;
-            pokemonImage.alt = currentPokemon.name;
-            preloadUpcomingImage();
+            currentPokemon = nextPokemon; updateAppCounters({incrementQuestion:true});
+            bopomofoText.classList.toggle('hide-zhuyin',isReadingMode);
+            const n = Array.from(currentPokemon.name).length;
+            bopomofoText.style.setProperty('--name-scale', String(Math.max(.65,Math.min(1,4.2/n))));
+            bopomofoText.innerHTML=generateZhuyinHTML(currentPokemon.name,currentPokemon.zhuyin);
+            pokemonImage.src=currentPokemon.image; pokemonImage.alt=currentPokemon.name; preloadUpcomingImage();
+            showQuestionPrompt();
         }
-
         function loadRandomPokemon() {
-            if (typeof pokemonDB === 'undefined' || pokemonDB.length === 0) return;
-            if (isChangingQuestion) return;
-
-            cancelActiveRecognition('換題 / 切換模式', true);
-
-            const nextPokemon = drawNextPokemon();
-            const wasFlipped = card.classList.contains('flipped');
-
-            if (!wasFlipped) {
-                card.classList.remove('flipped');
-                applyPokemonQuestion(nextPokemon);
-                return;
-            }
-
-            isChangingQuestion = true;
-            let finished = false;
-            let fallbackTimer = null;
-
-            const finishQuestionChange = () => {
-                if (finished) return;
-                finished = true;
-
-                if (fallbackTimer) {
-                    clearTimeout(fallbackTimer);
-                    fallbackTimer = null;
-                }
-
-                card.removeEventListener('transitionend', onCardTransitionEnd);
-                applyPokemonQuestion(nextPokemon);
-                isChangingQuestion = false;
-
-                if (pendingMicStart) {
-                    pendingMicStart = false;
-                    setTimeout(() => {
-                        if (!isChangingQuestion) startRecognition();
-                    }, 0);
-                }
-            };
-
-            const onCardTransitionEnd = (event) => {
-                if (event.target !== card || event.propertyName !== 'transform') return;
-                finishQuestionChange();
-            };
-
-            card.addEventListener('transitionend', onCardTransitionEnd);
-            card.classList.remove('flipped');
-            fallbackTimer = setTimeout(finishQuestionChange, 950);
+            if (typeof pokemonDB==='undefined'||!pokemonDB.length||isChangingQuestion||cardAnimating||activeSession) return;
+            isChangingQuestion=true; refreshControls(); const next=drawNextPokemon();
+            const complete=()=>{applyPokemonQuestion(next);isChangingQuestion=false;refreshControls();};
+            if(card.classList.contains('flipped')) animateCard(false,complete); else complete();
         }
 
         function normalizeZhuyinSyllable(value) {
@@ -1500,7 +1508,7 @@
             session.resultSource = reason;
 
             if (!selected) {
-                setStatus('⏸️ 沒有收到可判斷的語音文字，請再試一次。', 'retry');
+                setStatus('沒有收到辨識結果，請再按一次麥克風。', 'error');
                 return true;
             }
 
@@ -1532,404 +1540,276 @@
             return { evaluations, bestFinal };
         }
 
-        function finishFastSuccess(session, reason) {
-            if (!session || session.finished || session.cancelled || session.resultHandled) return false;
-            const applied = finalizeRecognitionDecision(session, reason);
-            if (applied) requestStop(session, reason, false);
-            return applied;
-        }
-
-        function scheduleFastDecision(session, delayMs, reason, mode = 'success') {
-            if (!session || session.finished || session.cancelled || session.resultHandled) return;
-            clearTimeout(session.earlyDecisionTimer);
-
-            session.earlyDecisionTimer = setTimeout(() => {
-                if (session.finished || session.cancelled || session.resultHandled) return;
-                const { bestFinal } = getBestFinalEvaluation(session);
-                if (!bestFinal) return;
-
-                if (mode === 'success') {
-                    if (bestFinal.score >= SCORE_CORRECT) finishFastSuccess(session, reason);
-                    return;
-                }
-
-                const targetLength = getTargetZhuyin(session.targetPokemon).length;
-                const spokenLength = Array.isArray(bestFinal.spokenZhuyin) ? bestFinal.spokenZhuyin.length : 0;
-
-                if (bestFinal.finalSeen && (spokenLength >= targetLength || String(bestFinal.cleanText || '').length >= targetLength)) {
-                    requestStop(session, reason, true);
-                }
-            }, delayMs);
-        }
-
-        function considerFastDecision(session) {
-            if (!session || session.finished || session.cancelled || session.resultHandled || session.stopRequested) return;
-            const { bestFinal } = getBestFinalEvaluation(session);
-            if (!bestFinal) return;
-
-            if (bestFinal.exactTextMatch || bestFinal.exactZhuyinMatch) {
-                clearTimeout(session.earlyDecisionTimer);
-                finishFastSuccess(session, bestFinal.exactTextMatch ? 'fast exact-text final' : 'fast exact-zhuyin final');
-                return;
-            }
-
-            if (bestFinal.score >= SCORE_CORRECT) {
-                scheduleFastDecision(session, FAST_FINAL_CONFIRM_MS, 'fast high-score final', 'success');
-                return;
-            }
-
-            const targetLength = getTargetZhuyin(session.targetPokemon).length;
-            const spokenLength = Array.isArray(bestFinal.spokenZhuyin) ? bestFinal.spokenZhuyin.length : 0;
-
-            if (spokenLength >= targetLength || String(bestFinal.cleanText || '').length >= targetLength) {
-                scheduleFastDecision(session, FINAL_BELOW_THRESHOLD_SETTLE_MS, 'complete final settled below threshold', 'stop-only');
+        // V17 lifecycle: one live recognition object, explicit release, new user gesture per attempt.
+        function refreshControls() {
+            const busy = Boolean(activeSession || isChangingQuestion || cardAnimating || !currentPokemon);
+            const cooling = performance.now() < cooldownUntil;
+            micBtn.disabled = busy || !initialized || cooling || !pinyinHealthy || !SpeechRecognition || document.hidden;
+            nextBtn.disabled = busy; modeBtn.disabled = busy; showBtn.disabled = busy;
+            if (!activeSession) {
+                micBtn.style.backgroundColor = '#4CAF50'; micBtn.setAttribute('aria-pressed','false');
+                micBtn.textContent = !initialized ? '初始化中…' : !SpeechRecognition ? '不支援語音辨識' : !pinyinHealthy ? '注音模組未就緒' : cooling ? '麥克風準備中…' : '🎤 按下說話';
             }
         }
-
-        function finishSession(session, options = {}) {
-            if (!session || session.finished) return;
-            session.finished = true;
+        function beginCooldown(ms) {
+            cooldownUntil = performance.now()+ms; clearTimeout(cooldownTimer);
+            cooldownTimer=setTimeout(refreshControls,ms+20); refreshControls();
+        }
+        function live(session) { return isCurrentSession(session) && !session.finished && !session.cancelled; }
+        function timer(session, name, delay, callback) {
+            clearTimeout(session[name]); session[name]=setTimeout(()=>{ if(live(session)) callback(); },delay);
+        }
+        function clearTimers(session) {
             clearSessionTimers(session);
-
-            if (isCurrentSession(session)) {
-                activeSession = null;
-                setMicBusy(false);
-            }
-
-            if (!session.cancelled && !session.resultHandled && !session.userMessageHandled && !options.keepStatus) {
-                setStatus('⏸️ 沒有收到可用的語音辨識結果，再試一次唷！', 'retry');
-            }
-
-            session.recognition = null;
+            for(const key of ['startTimer','audioStartTimer','noResultTimer','releaseTimer']) {clearTimeout(session[key]);session[key]=null;}
         }
-
-        function forceAbortSession(session, reason = 'watchdog') {
-            if (!session || session.finished || !session.recognition) return;
-            if (!session.abortRequested) {
-                session.abortRequested = true;
-                try { session.recognition.abort(); } catch (error) {}
-            }
-
-            clearTimeout(session.abortSettleTimer);
-            session.abortSettleTimer = setTimeout(() => {
-                if (!session.finished) {
-                    if (!session.cancelled && !session.resultHandled) {
-                        finalizeRecognitionDecision(session, `abort settle: ${reason}`);
-                    }
-                    finishSession(session, { keepStatus: true });
-                }
-            }, ABORT_SETTLE_MS);
-        }
-
-        function startHardSessionWatchdog(session) {
-            clearTimeout(session.hardLimitTimer);
-            session.hardLimitTimer = setTimeout(() => {
-                if (session.finished) return;
-                if (!session.resultHandled && !session.cancelled) {
-                    finalizeRecognitionDecision(session, 'hard session limit');
-                }
-                forceAbortSession(session, 'hard session limit');
-            }, HARD_SESSION_LIMIT_MS);
-        }
-
-        function startAudioStopWatchdog(session) {
-            clearTimeout(session.audioStopWatchdogTimer);
-            session.audioStopWatchdogTimer = setTimeout(() => {
-                if (session.finished || session.audioEnded || session.serviceEnded) return;
-                if (!session.resultHandled && !session.cancelled) {
-                    finalizeRecognitionDecision(session, 'audio stop watchdog');
-                }
-                forceAbortSession(session, 'audio stop watchdog');
-            }, AUDIO_STOP_WATCHDOG_MS);
-        }
-
-        function requestStop(session, reason = 'timer', updateMessage = true) {
-            if (!session || session.finished || session.serviceEnded || !session.recognition || session.stopRequested) return;
-
-            session.stopRequested = true;
-            session.stopReason = reason;
-            clearTimeout(session.preSpeechTimer);
-            clearTimeout(session.recordingTimer);
-            clearTimeout(session.speechEndTimer);
-
-            if (updateMessage && !session.cancelled) {
-                setStatus('⏳ 已收到完整答案，正在做最後確認...');
-                setMicBusy(true, '⏳ 判斷中...');
-            }
-
-            try {
-                session.recognition.stop();
-            } catch (error) {
-                finalizeRecognitionDecision(session, 'stop() threw');
-                forceAbortSession(session, 'stop() threw');
-                return;
-            }
-
-            startAudioStopWatchdog(session);
-        }
-
-        function cancelActiveRecognition(reason = 'cancel', silent = false) {
-            const session = activeSession;
+        function finishSession(session, confirmed = false) {
             if (!session || session.finished) return;
-            session.cancelled = true;
-            session.userMessageHandled = true;
-            session.stopReason = reason;
-            forceAbortSession(session, reason);
-            if (!silent) setStatus('⏸️ 錄音已取消。', 'retry');
+            session.finished=true; clearTimers(session);
+            trace(session,'FINISH',`end=${confirmed} results=${session.resultEvents} score=${session.resultHandled}`);
+            const rec=session.recognition;
+            if(rec) for(const key of ['onstart','onaudiostart','onsoundstart','onsoundend','onspeechstart','onspeechend','onaudioend','onresult','onnomatch','onerror','onend']) rec[key]=null;
+            session.recognition=null; session.candidateMap.clear();
+            if(isCurrentSession(session)) {
+                activeSession=null;
+                beginCooldown(confirmed ? (appleMobile?IOS_RELEASE_COOLDOWN_MS:100) : 900);
+            }
         }
-
-        function scheduleResultWaitAfterAudioEnd(session) {
-            clearTimeout(session.resultWaitTimer);
-            session.resultWaitTimer = setTimeout(() => {
-                if (session.finished || session.resultHandled || session.cancelled) return;
-                finalizeRecognitionDecision(session, 'audioend result settle timeout');
-                forceAbortSession(session, 'result settle complete');
-            }, RESULT_WAIT_AFTER_AUDIO_MS);
+        function markFault(session, reason) {
+            if (session.faultMarked) return;
+            session.faultMarked=true; consecutiveFaults++;
+            if(strategyPreference==='auto' && session.strategy==='fast') autoCompat=true;
+            trace(session,'FAULT',reason+' failures='+consecutiveFaults);
+            if(!session.resultHandled && !session.cancelled) {
+                session.userMessageHandled=true;
+                setStatus(consecutiveFaults>=2 ? '語音服務未回應，請重新開啟 App，或改用 Safari 網頁。' : '語音服務沒有回應，請再按一次麥克風。','error');
+            }
         }
-
+        function forceAbort(session, reason) {
+            if(session.finished || session.serviceEnded) return;
+            if(!session.abortRequested) {
+                session.abortRequested=true; trace(session,'ABORT',reason);
+                try {session.recognition.abort();} catch(e) {trace(session,'ABORT_ERROR',e.name||'error');}
+            }
+            if(session.finished || session.serviceEnded) return;
+            clearTimeout(session.abortSettleTimer);
+            session.abortSettleTimer=setTimeout(()=>{
+                if(session.finished||session.serviceEnded) return;
+                if(!session.cancelled) markFault(session,'end missing after abort');
+                finishSession(session,false);
+            },900);
+        }
+        function releaseWatchdog(session, reason) {
+            timer(session,'releaseTimer',RELEASE_TIMEOUT_MS,()=>{
+                if(session.serviceEnded) return;
+                if(!session.resultHandled && session.candidateMap.size && !session.userMessageHandled) finalizeRecognitionDecision(session,reason);
+                if(!session.resultHandled && !session.userMessageHandled) markFault(session,'release timeout');
+                forceAbort(session,reason);
+            });
+        }
+        function requestStop(session, reason, updateMessage=true) {
+            if(!live(session)||session.serviceEnded||session.stopRequested) return;
+            session.stopRequested=true; session.stopReason=reason;
+            for(const name of ['preSpeechTimer','recordingTimer','speechEndTimer','earlyDecisionTimer','startTimer','audioStartTimer','noResultTimer']) clearTimeout(session[name]);
+            trace(session,'STOP',reason);
+            if(updateMessage && !session.resultHandled && !session.userMessageHandled) setStatus('收音完成，正在確認答案…');
+            setMicBusy(true,'⏳ 收音結束中…');
+            try {session.recognition.stop();} catch(e) {trace(session,'STOP_ERROR',e.name||'error');forceAbort(session,reason);return;}
+            if(!session.serviceEnded && !session.finished) releaseWatchdog(session,reason);
+        }
+        function finishFastSuccess(session, reason) {
+            if(!live(session)||session.resultHandled) return;
+            if(!finalizeRecognitionDecision(session,reason)) return;
+            trace(session,'FAST_SUCCESS',reason);
+            // On Apple-compatible mode do not interrupt an ordinary successful utterance.
+            if(session.serviceEnded) return;
+            if(session.strategy==='fast') requestStop(session,reason,false);
+            else {
+                setMicBusy(true,'⏳ 等待麥克風釋放…');
+                for(const name of ['preSpeechTimer','recordingTimer','speechEndTimer','noResultTimer']) clearTimeout(session[name]);
+                timer(session,'releaseTimer',RELEASE_TIMEOUT_MS,()=>requestStop(session,'natural end timeout',false));
+            }
+        }
+        function considerFastDecision(session) {
+            if(!live(session)||session.resultHandled||session.stopRequested) return;
+            const {bestFinal}=getBestFinalEvaluation(session);
+            if(!bestFinal) return;
+            if(bestFinal.exactTextMatch||bestFinal.exactZhuyinMatch) {finishFastSuccess(session,'exact final');return;}
+            if(bestFinal.score>=SCORE_CORRECT) {
+                timer(session,'earlyDecisionTimer',FAST_FINAL_CONFIRM_MS,()=>{
+                    const {bestFinal: latest}=getBestFinalEvaluation(session);
+                    if(latest && latest.score>=SCORE_CORRECT) finishFastSuccess(session,'high final');
+                }); return;
+            }
+            // Preserve the natural end path for single-utterance recognition.
+            if(session.strategy==='compat') return;
+            const length=getTargetZhuyin(session.targetPokemon).length;
+            if(bestFinal.spokenZhuyin.length>=length || String(bestFinal.cleanText||'').length>=length)
+                timer(session,'earlyDecisionTimer',FINAL_BELOW_THRESHOLD_SETTLE_MS,()=>requestStop(session,'complete final settle'));
+        }
+        function cancelActiveRecognition(reason) {
+            const session=activeSession;
+            if(!session||session.finished) return;
+            session.cancelled=true; clearTimers(session); trace(session,'CANCEL',reason);
+            if(session.serviceEnded) finishSession(session,true); else forceAbort(session,reason);
+        }
         function createRecognitionSession() {
-            if (!SpeechRecognition || !currentPokemon) return null;
-
-            const recognition = new SpeechRecognition();
-            const session = {
-                id: ++sessionSerial,
-                recognition,
-                createdAt: performance.now(),
-                targetPokemon: currentPokemon,
-                started: false, audioStarted: false, audioEnded: false,
-                speechStarted: false, speechEnded: false, serviceEnded: false,
-                stopRequested: false, stopReason: '', abortRequested: false,
-                resultHandled: false, finalResultHandled: false, userMessageHandled: false,
-                cancelled: false, finished: false, resultSource: '',
-                candidateMap: new Map(),
-                recordingLimitMs: getSpeechRecordingLimitMs(currentPokemon),
-                preSpeechTimer: null, recordingTimer: null, speechEndTimer: null,
-                audioStopWatchdogTimer: null, resultWaitTimer: null, endGraceTimer: null,
-                hardLimitTimer: null, abortSettleTimer: null, earlyDecisionTimer: null
+            const recognition=new SpeechRecognition();
+            const session={id:++sessionSerial,recognition,createdAt:performance.now(),targetPokemon:currentPokemon,
+                strategy:chooseStrategy(),candidateMap:new Map(),recordingLimitMs:getSpeechRecordingLimitMs(currentPokemon),
+                started:false,audioStarted:false,audioEnded:false,speechStarted:false,serviceEnded:false,
+                stopRequested:false,abortRequested:false,resultHandled:false,userMessageHandled:false,cancelled:false,finished:false,
+                resultEvents:0,faultMarked:false};
+            recognition.lang='zh-TW'; recognition.interimResults=true; recognition.maxAlternatives=MAX_ALTERNATIVES;
+            recognition.continuous=session.strategy==='fast';
+            function ready() {
+                if(!live(session)||session.resultHandled||session.stopRequested) return;
+                setStatus('麥克風已準備好，請說出完整答案');setMicBusy(true,'🎙️ 請說話');
+                if(!session.speechStarted && !session.resultEvents) timer(session,'preSpeechTimer',WAIT_FOR_SPEECH_MS,()=>{
+                    session.userMessageHandled=true;
+                    setStatus('沒有收到說話內容，請再試一次。','retry');
+                    requestStop(session,'no speech timeout',false);
+                });
+            }
+            recognition.onstart=()=>{
+                if(!live(session)) return;
+                session.started=true;clearTimeout(session.startTimer);trace(session,'START');
+                if(!session.audioStarted&&!session.speechStarted&&!session.resultEvents) timer(session,'audioStartTimer',AUDIO_START_TIMEOUT_MS,()=>{
+                    markFault(session,'audio start timeout');forceAbort(session,'audio start timeout');
+                });
             };
-
-            recognition.lang = 'zh-TW';
-            recognition.interimResults = true;
-            recognition.maxAlternatives = MAX_ALTERNATIVES;
-            recognition.continuous = true;
-
-            recognition.onstart = () => {
-                if (!isCurrentSession(session) || session.cancelled) return;
-                session.started = true;
-                setStatus('👂 麥克風已開啟，請正常把完整答案說完');
-                setMicBusy(true, '⏹️ 錄音中...');
-
-                clearTimeout(session.preSpeechTimer);
-                session.preSpeechTimer = setTimeout(() => {
-                    if (!session.speechStarted && !session.finished) {
-                        session.userMessageHandled = true;
-                        setStatus('👂 還沒有聽到說話聲，再試一次唷！', 'retry');
-                        requestStop(session, '等待說話逾時', false);
+            recognition.onaudiostart=()=>{
+                if(!live(session)) return;
+                session.audioStarted=true;clearTimeout(session.startTimer);clearTimeout(session.audioStartTimer);trace(session,'AUDIO_START');ready();
+            };
+            recognition.onsoundstart=()=>{
+                if(!live(session)) return;
+                trace(session,'SOUND_START');clearTimeout(session.speechEndTimer);clearTimeout(session.earlyDecisionTimer);
+            };
+            recognition.onsoundend=()=>{if(live(session))trace(session,'SOUND_END');};
+            recognition.onspeechstart=()=>{
+                if(!live(session)||session.resultHandled||session.stopRequested) return;
+                trace(session,'SPEECH_START');clearTimeout(session.startTimer);clearTimeout(session.audioStartTimer);clearTimeout(session.preSpeechTimer);clearTimeout(session.speechEndTimer);clearTimeout(session.earlyDecisionTimer);
+                if(!session.speechStarted) {
+                    session.speechStarted=true;
+                    timer(session,'recordingTimer',session.recordingLimitMs,()=>requestStop(session,'recording cap'));
+                    if(!session.resultEvents) timer(session,'noResultTimer',Math.min(session.recordingLimitMs,Math.max(NO_RESULT_MS,session.recordingLimitMs-500)),()=>{
+                        markFault(session,'speech detected but no result');requestStop(session,'no result watchdog',false);
+                    });
+                }
+                setStatus('正在收音，請把完整答案說完');setMicBusy(true,'🎙️ 錄音中…');
+            };
+            recognition.onspeechend=()=>{
+                if(!live(session))return;
+                trace(session,'SPEECH_END');
+                if(session.resultHandled||session.stopRequested||session.strategy==='compat') return;
+                timer(session,'speechEndTimer',SPEECH_END_GRACE_MS,()=>requestStop(session,'speech end grace'));
+            };
+            recognition.onaudioend=()=>{
+                if(!live(session)) return;
+                session.audioEnded=true;trace(session,'AUDIO_END');
+                for(const name of ['preSpeechTimer','recordingTimer','speechEndTimer','noResultTimer','audioStartTimer']) clearTimeout(session[name]);
+                if(!session.resultHandled&&!session.userMessageHandled) setStatus('收音完成，正在確認答案…');
+                // Always watch for missing onend, even when the answer is already shown.
+                if(!session.serviceEnded) releaseWatchdog(session,'audioend without end');
+            };
+            recognition.onresult=event=>{
+                if(!live(session)||session.resultHandled) return;
+                session.resultEvents++; clearTimeout(session.startTimer);clearTimeout(session.audioStartTimer);clearTimeout(session.preSpeechTimer);clearTimeout(session.noResultTimer);clearTimeout(session.earlyDecisionTimer);
+                if(!session.speechStarted && !session.stopRequested && !session.audioEnded && !session.serviceEnded) {
+                    session.speechStarted=true;timer(session,'recordingTimer',session.recordingLimitMs,()=>requestStop(session,'result-based cap'));
+                }
+                captureRecognitionResult(session,event);
+                const hasFinal=Array.from(event.results||[]).some(r=>r.isFinal);
+                trace(session,hasFinal?'FINAL':'INTERIM',`candidates=${session.candidateMap.size}`);
+                if(session.candidateMap.size){consecutiveFaults=0;session.faultMarked=false;session.userMessageHandled=false;}
+                // During stop/end, collect late results but don't restart capture.
+                if(!session.stopRequested&&!session.serviceEnded) considerFastDecision(session);
+            };
+            recognition.onnomatch=()=>{
+                if(!live(session)||session.resultHandled) return;
+                trace(session,'NO_MATCH');
+                if(!session.candidateMap.size){session.userMessageHandled=true;setStatus('沒有辨識到完整答案，請再試一次。','retry');}
+                if(session.strategy==='fast') requestStop(session,'nomatch',false);
+                else releaseWatchdog(session,'nomatch without end');
+            };
+            recognition.onerror=event=>{
+                if(!live(session)) return;
+                const name=event.error||'unknown';trace(session,'ERROR',name);
+                if(session.resultHandled) {if(!session.serviceEnded)releaseWatchdog(session,'error after result');return;}
+                if(name==='aborted' && session.abortRequested) return;
+                session.userMessageHandled=true;
+                if(name==='not-allowed'||name==='service-not-allowed') setStatus('請允許使用麥克風，或在 Safari 中開啟。','error');
+                else if(name==='audio-capture') setStatus('麥克風無法使用，請檢查裝置設定。','error');
+                else if(name==='network') setStatus('語音服務連線失敗，請確認網路。','error');
+                else if(name==='no-speech') setStatus('沒有辨識到說話內容，請再試一次。','retry');
+                else {session.userMessageHandled=false;markFault(session,name);}
+                if(!session.serviceEnded)releaseWatchdog(session,'error without end');
+            };
+            recognition.onend=()=>{
+                if(session.finished||session.serviceEnded) return;
+                session.serviceEnded=true;trace(session,'END');clearTimers(session);
+                if(!isCurrentSession(session)||session.cancelled){finishSession(session,true);return;}
+                timer(session,'endGraceTimer',END_RESULT_GRACE_MS,()=>{
+                    if(!session.resultHandled){
+                        if(session.candidateMap.size) finalizeRecognitionDecision(session,'natural end');
+                        else if(!session.userMessageHandled) {
+                            if(session.speechStarted || !session.audioStarted) markFault(session,'end without recognition result');
+                            else { session.userMessageHandled=true; setStatus('沒有辨識到說話內容，請再試一次。','retry'); }
+                        }
                     }
-                }, WAIT_FOR_SPEECH_MS);
-
-                startHardSessionWatchdog(session);
+                    finishSession(session,true);
+                });
             };
-
-            recognition.onaudiostart = () => { session.audioStarted = true; };
-            recognition.onsoundstart = () => { clearTimeout(session.speechEndTimer); };
-            recognition.onsoundend = () => {};
-
-            recognition.onspeechstart = () => {
-                const firstSpeechStart = !session.speechStarted;
-                session.speechStarted = true;
-                session.speechEnded = false;
-                clearTimeout(session.preSpeechTimer);
-                clearTimeout(session.speechEndTimer);
-
-                if (firstSpeechStart) {
-                    clearTimeout(session.recordingTimer);
-                    session.recordingTimer = setTimeout(() => {
-                        requestStop(session, `speechstart 後 ${session.recordingLimitMs}ms 最大收音窗`, true);
-                    }, session.recordingLimitMs);
-                }
-
-                if (isCurrentSession(session) && !session.cancelled) {
-                    setStatus('🎙️ 正在收音，請把完整答案說完');
-                }
-            };
-
-            recognition.onspeechend = () => {
-                session.speechEnded = true;
-                if (isCurrentSession(session) && !session.cancelled) {
-                    setStatus(`⏳ 偵測到停頓，保留 ${SPEECH_END_GRACE_MS / 1000} 秒等待後續語音...`);
-                }
-
-                clearTimeout(session.speechEndTimer);
-                session.speechEndTimer = setTimeout(() => {
-                    if (!session.finished && !session.cancelled && !session.stopRequested) {
-                        requestStop(session, 'speechend 後靜音窗結束', true);
-                    }
-                }, SPEECH_END_GRACE_MS);
-            };
-
-            recognition.onaudioend = () => {
-                session.audioEnded = true;
-                clearTimeout(session.audioStopWatchdogTimer);
-                clearTimeout(session.preSpeechTimer);
-                clearTimeout(session.recordingTimer);
-                clearTimeout(session.speechEndTimer);
-
-                if (!session.resultHandled && !session.cancelled) {
-                    setStatus('⏳ 收音完成，正在做最後確認...');
-                    scheduleResultWaitAfterAudioEnd(session);
-                }
-            };
-
-            recognition.onresult = event => {
-                clearTimeout(session.earlyDecisionTimer);
-                captureRecognitionResult(session, event);
-                if (!isCurrentSession(session) || session.cancelled) return;
-                considerFastDecision(session);
-
-                if (!session.resultHandled && !session.stopRequested) {
-                    setStatus('🎙️ 已收到辨識結果，正在確認是否可以立即判斷...');
-                }
-            };
-
-            recognition.onnomatch = () => {
-                if (!isCurrentSession(session) || session.cancelled) return;
-                requestStop(session, 'nomatch', true);
-            };
-
-            recognition.onerror = event => {
-                const errorName = event && event.error ? event.error : 'unknown';
-                console.warn('[SpeechRecognition error]', errorName);
-
-                if (!isCurrentSession(session) || session.cancelled) return;
-                if (errorName === 'aborted' && session.abortRequested) return;
-
-                if (errorName === 'not-allowed' || errorName === 'service-not-allowed') {
-                    session.userMessageHandled = true;
-                    setStatus('🎤 請允許瀏覽器使用麥克風後再試一次。', 'error');
-                } else if (errorName === 'audio-capture') {
-                    session.userMessageHandled = true;
-                    setStatus('🎤 找不到可用的麥克風，請檢查裝置設定。', 'error');
-                } else if (errorName === 'network') {
-                    session.userMessageHandled = true;
-                    setStatus('🌐 語音服務連線失敗，請檢查網路後再試一次。', 'error');
-                }
-
-                if (!session.resultHandled && session.candidateMap.size) {
-                    finalizeRecognitionDecision(session, `error: ${errorName}`);
-                }
-
-                if (errorName !== 'aborted') {
-                    forceAbortSession(session, `error: ${errorName}`);
-                }
-            };
-
-            recognition.onend = () => {
-                session.serviceEnded = true;
-                clearTimeout(session.audioStopWatchdogTimer);
-                clearTimeout(session.resultWaitTimer);
-                clearTimeout(session.preSpeechTimer);
-                clearTimeout(session.recordingTimer);
-                clearTimeout(session.speechEndTimer);
-
-                if (!isCurrentSession(session)) {
-                    clearSessionTimers(session);
-                    return;
-                }
-
-                if (session.cancelled) {
-                    finishSession(session, { keepStatus: true });
-                    return;
-                }
-
-                clearTimeout(session.endGraceTimer);
-                session.endGraceTimer = setTimeout(() => {
-                    if (session.finished) return;
-                    if (!session.resultHandled) {
-                        finalizeRecognitionDecision(session, 'recognition onend settle');
-                    }
-                    finishSession(session, { keepStatus: true });
-                }, END_RESULT_GRACE_MS);
-            };
-
             return session;
         }
-
         function startRecognition() {
-            if (!SpeechRecognition || !currentPokemon) return;
-
-            if (typeof pinyinFn !== 'function') {
-                setStatus('❌ 注音判分模組目前不可用，已停止本次錄音，避免誤判。', 'error');
-                micBtn.disabled = true;
-                micBtn.textContent = '⚠️ 判分模組未載入';
-                return;
-            }
-
-            if (activeSession && !activeSession.finished) return;
-
-            const session = createRecognitionSession();
-            if (!session) return;
-
-            activeSession = session;
-            setStatus('🎤 麥克風準備中...');
-            setMicBusy(true, '🎤 準備中...');
-
-            try {
-                session.recognition.start();
-            } catch (error) {
-                console.warn('[SpeechRecognition start failed]', error);
-                session.userMessageHandled = true;
-                setStatus('🎤 麥克風還沒準備好，請再按一次。', 'retry');
-                finishSession(session, { keepStatus: true });
-            }
+            if(!initialized||!pinyinHealthy||!SpeechRecognition||!currentPokemon||activeSession||cardAnimating||isChangingQuestion||document.hidden||performance.now()<cooldownUntil) return;
+            let session;
+            try {session=createRecognitionSession();} catch(e) {setStatus('語音服務無法啟動，請重新開啟。','error');trace(null,'CREATE_ERROR',e.name||'error');return;}
+            activeSession=session;refreshControls();setStatus('麥克風準備中，等提示再說話');setMicBusy(true,'⏳ 準備中…');
+            trace(session,'CREATE',`mode=${session.strategy} max=${session.recordingLimitMs}`);
+            timer(session,'startTimer',START_TIMEOUT_MS,()=>{markFault(session,'start timeout');forceAbort(session,'start timeout');});
+            timer(session,'hardLimitTimer',HARD_LIMIT_MS,()=>{
+                if(!session.resultHandled&&!session.userMessageHandled) {
+                    if(session.candidateMap.size) finalizeRecognitionDecision(session,'hard limit'); else markFault(session,'hard limit');
+                }
+                forceAbort(session,'hard limit');
+            });
+            // start() stays synchronous within the real tap. Never auto-start from a timer.
+            try {session.recognition.start();} catch(e) {markFault(session,'start threw '+(e.name||'error'));finishSession(session,false);}
         }
-
-        modeBtn.addEventListener('click', () => {
-            if (isChangingQuestion) return;
-            pendingMicStart = false;
-            isReadingMode = !isReadingMode;
-            modeBtn.textContent = isReadingMode ? '切換為：拼音模式' : '切換為：認字模式';
-            loadRandomPokemon();
+        modeBtn.addEventListener('click',()=>{
+            if(activeSession||isChangingQuestion||cardAnimating||!currentPokemon) return;
+            isReadingMode=!isReadingMode;modeBtn.textContent=isReadingMode?'切換為：拼音模式':'切換為：認字模式';loadRandomPokemon();
         });
-
-        micBtn.addEventListener('click', () => {
-            if (isChangingQuestion) {
-                pendingMicStart = true;
-                setStatus('⏳ 正在換題，完成後會自動開啟麥克風...');
-                return;
-            }
-            startRecognition();
+        micBtn.addEventListener('click',startRecognition);
+        showBtn.addEventListener('click',()=>{if(activeSession||isChangingQuestion||cardAnimating||!currentPokemon)return;revealAnswer();setStatus(`答案是：${currentPokemon.name}`);});
+        nextBtn.addEventListener('click',()=>{if(!activeSession&&!isChangingQuestion&&!cardAnimating&&currentPokemon)loadRandomPokemon();});
+        document.addEventListener('visibilitychange',()=>{
+            if(document.hidden){stopConfetti();cancelActiveRecognition('background');}
+            else {trace(null,'FOREGROUND'); if(!activeSession){beginCooldown(appleMobile?450:100);if(currentPokemon&&!card.classList.contains('flipped')) showQuestionPrompt();}}
         });
+        window.addEventListener('pagehide',()=>{stopConfetti();cancelActiveRecognition('pagehide');});
+        window.addEventListener('pageshow',e=>{if(e.persisted){cancelActiveRecognition('pageshow restore');refreshControls();}});
+        // Parent-only panel: bounded in-memory event summaries; no speech text or persistent history.
+        let holdTimer;const trigger=document.getElementById('parentTrigger');
+        function openParent(){parentPanel.hidden=false;renderEvents();}
+        trigger.addEventListener('pointerdown',()=>{clearTimeout(holdTimer);holdTimer=setTimeout(openParent,3000);});
+        for(const type of ['pointerup','pointercancel','pointerleave'])trigger.addEventListener(type,()=>clearTimeout(holdTimer));
+        trigger.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openParent();}});
+        trigger.addEventListener('contextmenu',e=>e.preventDefault());
+        document.getElementById('closeParent').onclick=()=>{parentPanel.hidden=true;};
+        document.getElementById('clearEvents').onclick=()=>{events.length=0;renderEvents();};
+        document.getElementById('voiceMode').onchange=e=>{strategyPreference=e.target.value;autoCompat=false;consecutiveFaults=0;trace(null,'STRATEGY',strategyPreference);renderEvents();};
+        document.getElementById('copyEvents').onclick=async()=>{
+            const output=document.getElementById('eventOutput');
+            try{await navigator.clipboard.writeText(output.textContent);document.getElementById('copyEvents').textContent='已複製';}
+            catch(e){const r=document.createRange();r.selectNodeContents(output);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);document.getElementById('copyEvents').textContent='請手動複製選取文字';}
+        };
+        refreshControls();
 
-        showBtn.addEventListener('click', () => {
-            if (isChangingQuestion || !currentPokemon) return;
-            pendingMicStart = false;
-            cancelActiveRecognition('查看答案', true);
-            revealAnswer();
-            setStatus(`答案是：${currentPokemon.name}`);
-        });
 
-        nextBtn.addEventListener('click', () => {
-            if (isChangingQuestion) return;
-            pendingMicStart = false;
-            loadRandomPokemon();
-        });
-
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden && activeSession && !activeSession.finished) {
-                activeSession.cancelled = true;
-                activeSession.userMessageHandled = true;
-                forceAbortSession(activeSession, 'visibilitychange');
-            }
-        });
-
-        window.addEventListener('pagehide', () => {
-            if (activeSession && !activeSession.finished) {
-                activeSession.cancelled = true;
-                activeSession.userMessageHandled = true;
-                forceAbortSession(activeSession, 'pagehide');
-            }
-        });
     </script>
 </body>
 </html>
