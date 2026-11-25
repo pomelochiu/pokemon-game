@@ -2,69 +2,130 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="寶可夢挑戰">
+    <meta name="theme-color" content="#f4f6fb">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-192.png">
     <title>寶可夢拼音/認字挑戰</title>
     <style>
         * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        html {
-            min-height: 100%;
+        html, body {
+            height: 100%;
+            height: 100dvh;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* 鎖定單一畫面，像原生 App 一樣不捲動 */
+            overscroll-behavior: none;
+            background: linear-gradient(180deg, #eef3fc 0%, #f8f9fc 100%);
+            font-family: "Microsoft JhengHei", "PingFang TC", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
         }
 
         body {
-            font-family: "Microsoft JhengHei", "PingFang TC", Arial, sans-serif;
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            min-height: 100dvh;
-            background-color: #f5f5f5;
-            margin: 0;
-            padding: max(18px, env(safe-area-inset-top))
-                     max(18px, env(safe-area-inset-right))
-                     max(22px, env(safe-area-inset-bottom))
-                     max(18px, env(safe-area-inset-left));
-            overscroll-behavior: none;
+            justify-content: center;
+            padding-top: max(12px, env(safe-area-inset-top));
+            padding-bottom: max(14px, env(safe-area-inset-bottom));
+            padding-left: max(14px, env(safe-area-inset-left));
+            padding-right: max(14px, env(safe-area-inset-right));
         }
 
+        /* App 主容器：一屏到底均分上、中、下三區 */
         .game-shell {
             width: min(100%, 760px);
+            height: 100%;
             display: flex;
             flex-direction: column;
+            justify-content: space-between;
             align-items: center;
+            position: relative;
         }
 
+        /* 頂部 App 狀態列（星星計分 + 題號 + 模式切換） */
         .header-bar {
             width: 100%;
             display: flex;
-            justify-content: flex-end;
-            margin-bottom: 18px;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+            padding: 4px 2px;
+        }
+
+        .app-badges {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge-pill {
+            background: #ffffff;
+            border: 2px solid #e2e8f0;
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: clamp(15px, 2vw, 18px);
+            font-weight: 800;
+            color: #334155;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        .badge-pill.star {
+            border-color: #fde047;
+            background: #fefce8;
+            color: #854d0e;
         }
 
         #modeBtn {
-            font-size: clamp(17px, 2vw, 21px);
-            padding: 10px 18px;
-            min-height: 48px;
-            background-color: #9c27b0;
+            font-size: clamp(15px, 2vw, 18px);
+            padding: 8px 16px;
+            min-height: 44px;
+            background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%);
             color: white;
             border: none;
-            border-radius: 10px;
+            border-radius: 999px;
             cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: 0 3px 8px rgba(156, 39, 176, 0.25);
             font-weight: bold;
             touch-action: manipulation;
+            white-space: nowrap;
+            transition: transform 0.12s ease;
+        }
+
+        #modeBtn:active {
+            transform: scale(0.95);
+        }
+
+        /* 中央遊戲主舞台：自動適應剩餘高度 */
+        .stage-area {
+            flex: 1;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 0; /* 允許在較矮螢幕自動微縮 */
+            gap: clamp(10px, 2vh, 20px);
+            padding: 6px 0;
         }
 
         .card-container {
             perspective: 1000px;
-            width: clamp(250px, 33vw, 340px);
+            height: min(38vh, 330px);
+            max-width: 72vw;
             aspect-ratio: 7 / 10;
-            margin-bottom: 26px;
+            flex-shrink: 1;
         }
 
         .card {
@@ -89,8 +150,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 18px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 22px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
             background-color: white;
             border: 6px solid #ffcc00;
             overflow: hidden;
@@ -101,8 +162,8 @@
         }
 
         .pokeball {
-            width: clamp(105px, 14vw, 145px);
-            height: clamp(105px, 14vw, 145px);
+            width: clamp(88px, 13vh, 135px);
+            height: clamp(88px, 13vh, 135px);
             border-radius: 50%;
             background: linear-gradient(to bottom, #d22630 46%, #000000 46%, #000000 54%, #ffffff 54%);
             border: 6px solid #000000;
@@ -116,11 +177,11 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 32px;
-            height: 32px;
+            width: 28%;
+            height: 28%;
             background: #ffffff;
             border-radius: 50%;
-            border: 6px solid #000000;
+            border: 5px solid #000000;
         }
 
         .pokeball::after {
@@ -129,8 +190,8 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 12px;
-            height: 12px;
+            width: 11%;
+            height: 11%;
             background: #ffffff;
             border-radius: 50%;
             border: 1px solid #dddddd;
@@ -151,6 +212,21 @@
             -webkit-user-drag: none;
         }
 
+        /* 題目字卡區（App 卡片式白底圓角框） */
+        .word-card {
+            width: 100%;
+            background: #ffffff;
+            border-radius: 22px;
+            padding: clamp(10px, 1.8vh, 18px) 16px;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
         .bopomofo-display {
             width: 100%;
             display: flex;
@@ -158,8 +234,7 @@
             justify-content: center;
             align-items: center;
             gap: clamp(12px, 3vw, 26px);
-            margin-bottom: 16px;
-            min-height: 116px;
+            min-height: clamp(82px, 12vh, 114px);
             flex-wrap: wrap;
         }
 
@@ -169,20 +244,19 @@
             align-items: center;
         }
 
-        /* ：、・、．等只負責顯示，不再產生一欄「假注音」。 */
         .char-block.symbol-only {
             justify-content: center;
         }
 
         .char-block.symbol-only .char-text {
-            font-size: clamp(36px, 5.2vw, 58px);
+            font-size: clamp(34px, 5vw, 54px);
             font-weight: 700;
         }
 
         .char-text {
-            font-size: clamp(43px, 6vw, 68px);
+            font-size: clamp(40px, 5.8vw, 64px);
             font-weight: bold;
-            color: #222;
+            color: #1e293b;
             line-height: 1.1;
         }
 
@@ -192,8 +266,8 @@
             flex-direction: column;
             justify-content: center;
             margin-left: 4px;
-            font-size: clamp(20px, 2.7vw, 29px);
-            color: #444;
+            font-size: clamp(19px, 2.5vw, 28px);
+            color: #475569;
             line-height: 1.1;
             font-weight: bold;
         }
@@ -224,285 +298,259 @@
 
         #statusMessage {
             width: 100%;
-            font-size: clamp(20px, 2.8vw, 26px);
-            color: #555;
-            min-height: 46px;
-            margin-bottom: 18px;
+            font-size: clamp(17px, 2.4vw, 22px);
+            color: #475569;
+            min-height: 32px;
+            margin-top: 6px;
             font-weight: bold;
             text-align: center;
-            line-height: 1.4;
+            line-height: 1.35;
         }
 
-        #statusMessage.success { color: #2e7d32; }
-        #statusMessage.close { color: #ef6c00; }
-        #statusMessage.retry { color: #555; }
-        #statusMessage.error { color: #c62828; }
+        #statusMessage.success { color: #16a34a; }
+        #statusMessage.close { color: #ea580c; }
+        #statusMessage.retry { color: #475569; }
+        #statusMessage.error { color: #dc2626; }
 
+        /* 底部固定 App 操作列 */
         .controls {
             width: 100%;
-            display: flex;
-            gap: 14px;
-            flex-wrap: wrap;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            flex-shrink: 0;
+            padding-top: 4px;
+        }
+
+        /* 麥克風主按鈕佔滿整排上方，方便單手或雙手拇指點擊 */
+        #micBtn {
+            grid-column: 1 / -1;
+            font-size: clamp(21px, 3vw, 26px);
+            min-height: 62px;
+            border-radius: 18px;
+            box-shadow: 0 6px 16px rgba(76, 175, 80, 0.3);
         }
 
         button.action-btn {
-            font-size: clamp(21px, 3vw, 28px);
-            padding: 14px 30px;
-            min-height: 60px;
+            font-size: clamp(18px, 2.5vw, 22px);
+            padding: 12px 18px;
+            min-height: 54px;
             border: none;
-            border-radius: 12px;
+            border-radius: 16px;
             cursor: pointer;
             background-color: #4CAF50;
             color: white;
             font-weight: bold;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.12);
             touch-action: manipulation;
             white-space: nowrap;
+            transition: transform 0.1s ease, background-color 0.2s ease;
         }
 
         button.action-btn:active { transform: scale(0.97); }
-        button.action-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-        button.action-btn.secondary { background-color: #2196F3; }
+        button.action-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        button.action-btn.secondary {
+            background: linear-gradient(135deg, #2196F3 0%, #1976d2 100%);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.25);
+        }
         button.action-btn.outline {
-            background-color: transparent;
-            color: #666;
-            border: 2px solid #ccc;
-            box-shadow: none;
+            background-color: #ffffff;
+            color: #475569;
+            border: 2px solid #cbd5e1;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
         }
 
-        /* iPad / 平板 */
-        @media (min-width: 601px) and (max-width: 1180px) {
-            body {
-                padding-top: max(22px, env(safe-area-inset-top));
+        /* 平板 / 寬螢幕：三顆按鈕並排 */
+        @media (min-width: 601px) {
+            .controls {
+                grid-template-columns: 2fr 1fr 1fr;
+                gap: 14px;
             }
-
-            .game-shell {
-                width: min(92vw, 820px);
+            #micBtn {
+                grid-column: auto;
+                min-height: 60px;
             }
-
-            .header-bar {
-                margin-bottom: 16px;
-            }
-
-            .card-container {
-                width: clamp(300px, 39vw, 390px);
-                margin-bottom: 24px;
-            }
-
-            .card-front img {
-                width: 116%;
-                height: 116%;
-            }
-
-            .bopomofo-display {
-                min-height: 126px;
-            }
-
             button.action-btn {
-                min-width: 180px;
-                padding-left: 28px;
-                padding-right: 28px;
+                min-height: 60px;
             }
         }
 
-        /* iPad 橫向 */
+        /* 平板橫向模式特別優化 */
         @media (min-width: 768px) and (max-height: 850px) and (orientation: landscape) {
-            .header-bar { margin-bottom: 8px; }
-            .card-container {
-                width: min(29vw, 290px);
-                margin-bottom: 12px;
-            }
-            .bopomofo-display {
-                min-height: 82px;
-                margin-bottom: 8px;
-            }
-            .char-text { font-size: clamp(40px, 5vw, 56px); }
-            #statusMessage {
-                margin-bottom: 10px;
-                min-height: 38px;
-            }
-            button.action-btn {
-                min-height: 52px;
-                padding-top: 10px;
-                padding-bottom: 10px;
-            }
-        }
-
-        /* 手機 */
-        @media (max-width: 600px) {
-            body {
-                padding: max(14px, env(safe-area-inset-top))
-                         max(12px, env(safe-area-inset-right))
-                         max(18px, env(safe-area-inset-bottom))
-                         max(12px, env(safe-area-inset-left));
-            }
-            .header-bar {
+            .stage-area {
+                flex-direction: row;
                 justify-content: center;
-                margin-bottom: 14px;
+                gap: 28px;
             }
             .card-container {
-                width: min(66vw, 240px);
-                margin-bottom: 16px;
+                height: min(56vh, 320px);
             }
-            .card-face { border-width: 5px; }
-            .card-front img { width: 116%; height: 116%; }
-            .pokeball { width: 90px; height: 90px; }
-            .bopomofo-display {
-                gap: 10px;
-                min-height: 88px;
-                margin-bottom: 12px;
+            .word-card {
+                width: auto;
+                min-width: 320px;
+                max-width: 440px;
+                padding: 20px 24px;
             }
-            .char-text { font-size: 40px; }
-            .zhuyin-col { font-size: 18px; margin-left: 2px; }
-            .tone-side {
-                right: -0.5em;
-                top: 60%;
-                transform: translateY(-42%);
-            }
-            .tone-light { top: -0.7em; }
-            #statusMessage {
-                font-size: 18px;
-                min-height: 40px;
-                margin-bottom: 14px;
-            }
-            button.action-btn {
-                font-size: 20px;
-                padding: 12px 20px;
-                min-height: 52px;
-            }
-            .controls { gap: 9px; }
         }
 
-
+        /* 答對慶祝紙花畫布 */
+        #confettiCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
     </style>
 </head>
 <body>
+    <canvas id="confettiCanvas"></canvas>
+
     <main class="game-shell">
         <div class="header-bar">
+            <div class="app-badges">
+                <div class="badge-pill star">⭐ <span id="starCount">0</span></div>
+                <div class="badge-pill">第 <span id="questionNum">1</span> 題</div>
+            </div>
             <button id="modeBtn" type="button">切換為：認字模式</button>
         </div>
 
-        <div class="card-container">
-            <div class="card" id="pokemonCard">
-                <div class="card-face card-back">
-                    <div class="pokeball"></div>
-                </div>
-                <div class="card-face card-front">
-                    <img id="pokemonImage" src="" alt="Pokemon" decoding="async" fetchpriority="high">
+        <div class="stage-area">
+            <div class="card-container">
+                <div class="card" id="pokemonCard">
+                    <div class="card-face card-back">
+                        <div class="pokeball"></div>
+                    </div>
+                    <div class="card-face card-front">
+                        <img id="pokemonImage" src="" alt="Pokemon" decoding="async" fetchpriority="high">
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="bopomofo-display" id="bopomofoText"></div>
-        <div id="statusMessage">準備好了嗎？</div>
+            <div class="word-card">
+                <div class="bopomofo-display" id="bopomofoText"></div>
+                <div id="statusMessage">準備好了嗎？</div>
+            </div>
+        </div>
 
         <div class="controls">
             <button id="micBtn" class="action-btn" type="button">🎤 按下說話</button>
             <button id="showBtn" class="action-btn outline" type="button">看答案</button>
             <button id="nextBtn" class="action-btn secondary" type="button">下一題</button>
         </div>
-
-
-
     </main>
 
     <script src="dataset.js"></script>
     <script>
         /* =========================================================
-         * 寶可夢拼音 / 認字挑戰 V16 - Production
-         *
-         * 正式版重點：
-         * 1. pinyin-pro 多來源載入與健康檢查，避免同音字答案被誤判為 0 分。
-         * 2. continuous = true，改善慢速／分段發音。
-         * 3. 收集 interim / final / alternatives 到候選池，再做注音與相似度判斷。
-         * 4. Fast Decision：高可信 Final 提早判定，模糊答案才繼續等待。
-         * 5. 保留 90 / 75 門檻、保守近音救援、翻牌防閃圖與 Safari 保護。
-         * 6. 已移除測試版診斷 UI 與紀錄工具，保留正式運作所需核心邏輯。
+         * App 體驗增強模組（PWA 離線註冊、計分進度、答對慶祝動畫）
+         * ========================================================= */
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch((err) => {
+                    console.warn('[PWA] Service Worker 註冊略過:', err);
+                });
+            });
+        }
+
+        let appStarScore = 0;
+        let appQuestionCount = 0;
+        let currentQuestionScored = false;
+
+        function updateAppCounters({ incrementQuestion = false, addStar = false } = {}) {
+            if (incrementQuestion) {
+                appQuestionCount++;
+                currentQuestionScored = false;
+                const qEl = document.getElementById('questionNum');
+                if (qEl) qEl.textContent = appQuestionCount;
+            }
+            if (addStar && !currentQuestionScored) {
+                currentQuestionScored = true;
+                appStarScore++;
+                const sEl = document.getElementById('starCount');
+                if (sEl) sEl.textContent = appStarScore;
+                launchConfetti();
+            }
+        }
+
+        function launchConfetti() {
+            const canvas = document.getElementById('confettiCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const colors = ['#ffcc00', '#ff5252', '#4caf50', '#2196f3', '#ab47bc', '#ff9800'];
+            const pieces = Array.from({ length: 55 }, () => ({
+                x: canvas.width * (0.2 + Math.random() * 0.6),
+                y: canvas.height * 0.35,
+                vx: (Math.random() - 0.5) * 12,
+                vy: -Math.random() * 10 - 4,
+                size: Math.random() * 8 + 6,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                rot: Math.random() * 360,
+                vRot: (Math.random() - 0.5) * 14
+            }));
+
+            let frame = 0;
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                pieces.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.42; // 重力
+                    p.rot += p.vRot;
+
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate((p.rot * Math.PI) / 180);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+                    ctx.restore();
+                });
+
+                frame++;
+                if (frame < 75) {
+                    requestAnimationFrame(draw);
+                } else {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+            requestAnimationFrame(draw);
+        }
+
+        /* =========================================================
+         * 寶可夢拼音 / 認字挑戰 V16 - Production（原始核心邏輯完全保留）
          * ========================================================= */
 
         let currentPokemon = null;
         let isReadingMode = false;
         let pinyinFn = null;
 
-        /*
-         * V16：pinyin-pro 是同音字 / 近音字判分的必要元件。
-         * 若它未載入，除了 exact text 之外，
-         * 所有候選都會落到 pinyin-unavailable => 0 分。
-         */
         let pinyinLoadSource = 'NOT_LOADED';
-
-        /*
-         * 換題翻牌鎖：
-         * 當答案正面正在翻回背面時，暫時不接受新的換題／作答操作，
-         * 避免下一題圖片在翻牌動畫尚未完成前提前露出。
-         */
         let isChangingQuestion = false;
-
-        /*
-         * 使用者若在翻牌換題的 0.8~0.95 秒內按下麥克風，
-         * 不再把 click 丟掉，而是等新題真正套用後自動開始錄音。
-         */
         let pendingMicStart = false;
 
         const SCORE_CORRECT = 90;
         const SCORE_CLOSE = 75;
-
-        /*
-         * Final / Interim 融合採保守規則：
-         * - Final 本身 >= 90：直接採 Final。
-         * - Final < 90 時，只有強 Interim >= 90 且 Final 仍至少「接近」才考慮救援。
-         * 這樣主要救回 ASR 最後一步改壞文字的情況，不全面放寬錯誤答案。
-         */
         const INTERIM_RESCUE_MIN_FINAL_SCORE = 75;
-
-        /* 等待孩子真正開始說話的最大時間。 */
         const WAIT_FOR_SPEECH_MS = 7000;
-
-        /*
-         * V16：speechend 靜音窗縮短。
-         * 真正提升準確率的是 pinyin-pro / 候選池，而不是固定長時間等待。
-         */
         const SPEECH_END_GRACE_MS = 1500;
-
-        /* stop() 後，若 Safari 連 audioend/end 都沒有，再執行 abort。 */
         const AUDIO_STOP_WATCHDOG_MS = 2500;
-
-        /*
-         * audioend 後只保留較短 final 結果等待窗。
-         * 一般情況 onend 會更早到，這裡主要當 Safari fallback。
-         */
         const RESULT_WAIT_AFTER_AUDIO_MS = 1600;
-
-        /* onend 後只留短暫 settle，讓最後一個 result 有機會進來。 */
         const END_RESULT_GRACE_MS = 400;
-
-        /*
-         * V16 Fast Decision：
-         * - Final exact text / exact zhuyin：立即成功。
-         * - Final >= 90：短暫 250ms 穩定確認後成功。
-         * - 已有完整 Final 但分數不足：再聽 900ms，若沒有新結果就結束。
-         */
         const FAST_FINAL_CONFIRM_MS = 250;
         const FINAL_BELOW_THRESHOLD_SETTLE_MS = 900;
-
-        /* 整個 session 的最終保險。動態錄音上限提高後，總上限也略放寬。 */
         const HARD_SESSION_LIMIT_MS = 26000;
         const ABORT_SETTLE_MS = 900;
         const MAX_ALTERNATIVES = 5;
-
-        /*
-         * 每一個 SpeechRecognitionResult 仍只向瀏覽器要求最多 5 個 alternatives，
-         * 但多段 result 組合後允許最多 15 個完整句候選進入真正的語音相似度評分。
-         */
         const MAX_UTTERANCE_CANDIDATES = 15;
 
-        /* 名稱中這些符號有視覺意義，但沒有發音。 */
         const SILENT_NAME_SYMBOLS = new Set([
             '：', ':', '・', '．', '.', '·', '•', '‧'
         ]);
 
-        /* 一輪不重複抽題。 */
         let questionBag = [];
         let lastPokemon = null;
 
@@ -534,7 +582,6 @@
             micBtn.setAttribute('aria-pressed', isBusy ? 'true' : 'false');
         }
 
-
         function escapeHtml(value) {
             return String(value ?? '')
                 .replace(/&/g, '&amp;')
@@ -556,17 +603,8 @@
             return getTargetZhuyin(pokemon).length;
         }
 
-        /*
-         * 依真正要念的音節數設定「最長說話時間」。
-         * speechend 通常會讓錄音提早結束，所以這只是安全上限。
-         */
         function getSpeechRecordingLimitMs(pokemon) {
             const count = getPronounceableSyllableCount(pokemon);
-
-            /*
-             * V16：這些只剩「最長安全上限」。
-             * 正常情況應由 Fast Decision 在更早時間結束。
-             */
             if (count <= 2) return 5000;
             if (count === 3) return 6000;
             if (count === 4) return 7000;
@@ -583,8 +621,6 @@
 
         function refillQuestionBag() {
             questionBag = shuffleArray([...pokemonDB]);
-
-            /* 新一輪的第一題避免剛好等於上一輪最後一題。 */
             if (
                 lastPokemon &&
                 questionBag.length > 1 &&
@@ -599,7 +635,6 @@
             if (!questionBag.length) {
                 refillQuestionBag();
             }
-
             const pokemon = questionBag.pop();
             lastPokemon = pokemon;
             return pokemon;
@@ -609,90 +644,51 @@
             if (!questionBag.length) return;
             const nextPokemon = questionBag[questionBag.length - 1];
             if (!nextPokemon || !nextPokemon.image) return;
-
             const img = new Image();
             img.src = nextPokemon.image;
         }
 
         function validateDataset() {
             if (!Array.isArray(pokemonDB)) return;
-
             const issues = [];
-            const specialTokens = [];
             const names = new Set();
 
             pokemonDB.forEach((pokemon, index) => {
                 const position = index + 1;
                 const chars = Array.from(String(pokemon && pokemon.name || ''));
-                const zhuyin = pokemon && Array.isArray(pokemon.zhuyin)
-                    ? pokemon.zhuyin
-                    : [];
+                const zhuyin = pokemon && Array.isArray(pokemon.zhuyin) ? pokemon.zhuyin : [];
 
                 if (!pokemon || !pokemon.name) {
                     issues.push(`#${position} 缺少 name`);
                     return;
                 }
-
                 if (!Array.isArray(pokemon.zhuyin)) {
                     issues.push(`${pokemon.name}：zhuyin 不是陣列`);
                 } else if (chars.length !== zhuyin.length) {
-                    issues.push(
-                        `${pokemon.name}：名稱 ${chars.length} 個字元，但 zhuyin 有 ${zhuyin.length} 個項目`
-                    );
+                    issues.push(`${pokemon.name}：名稱 ${chars.length} 個字元，但 zhuyin 有 ${zhuyin.length} 個項目`);
                 }
-
                 if (!pokemon.image) {
                     issues.push(`${pokemon.name}：缺少 image`);
                 }
-
                 if (names.has(pokemon.name)) {
                     issues.push(`${pokemon.name}：名稱重複`);
                 }
                 names.add(pokemon.name);
-
-                chars.forEach((char, charIndex) => {
-                    const bpmf = zhuyin[charIndex] || '';
-                    if (isSilentNameSymbol(char)) {
-                        specialTokens.push(`${pokemon.name}：${char}（無聲顯示符號）`);
-                    } else if (!isRealZhuyin(bpmf)) {
-                        specialTokens.push(`${pokemon.name}：${char} / ${bpmf || '空白'}（特殊名稱字元）`);
-                    }
-                });
             });
+
             if (issues.length) {
                 console.warn(`發現 ${issues.length} 個結構問題：`);
                 issues.forEach(item => console.warn(item));
-            } else {
-            }
-
-            if (specialTokens.length) {
             }
         }
 
-
-        /* =========================================================
-         * V15 pinyin-pro resilient loader
-         * ========================================================= */
-
         function registerPinyinFromGlobal(sourceLabel) {
-            if (
-                window.pinyinPro &&
-                typeof window.pinyinPro.pinyin === 'function'
-            ) {
+            if (window.pinyinPro && typeof window.pinyinPro.pinyin === 'function') {
                 pinyinFn = window.pinyinPro.pinyin;
                 pinyinLoadSource = sourceLabel;
                 return true;
             }
             return false;
-        }
-
-        function recordPinyinLoadAttempt(source, status, extra = '') {
-            const item = {
-                source,
-                status,
-                extra: String(extra || ''),
-                time: new Date().toISOString()
-            };
         }
 
         function loadPinyinClassicScript(url, sourceLabel, timeoutMs = 6000) {
@@ -711,24 +707,12 @@
                     clearTimeout(timer);
                     script.onload = null;
                     script.onerror = null;
-
-                    if (ok) {
-                        resolve(true);
-                    } else {
-                        reject(error || new Error(`${sourceLabel} failed`));
-                    }
+                    if (ok) resolve(true);
+                    else reject(error || new Error(`${sourceLabel} failed`));
                 };
 
                 const timer = setTimeout(() => {
-                    recordPinyinLoadAttempt(
-                        sourceLabel,
-                        'TIMEOUT',
-                        `${timeoutMs}ms`
-                    );
-                    finish(
-                        false,
-                        new Error(`${sourceLabel} timeout after ${timeoutMs}ms`)
-                    );
+                    finish(false, new Error(`${sourceLabel} timeout after ${timeoutMs}ms`));
                 }, timeoutMs);
 
                 script.async = true;
@@ -737,28 +721,13 @@
 
                 script.onload = () => {
                     if (registerPinyinFromGlobal(sourceLabel)) {
-                        recordPinyinLoadAttempt(sourceLabel, 'LOADED');
                         finish(true);
                     } else {
-                        recordPinyinLoadAttempt(
-                            sourceLabel,
-                            'SCRIPT_LOADED_BUT_GLOBAL_MISSING'
-                        );
-                        finish(
-                            false,
-                            new Error(
-                                `${sourceLabel} loaded but window.pinyinPro.pinyin is missing`
-                            )
-                        );
+                        finish(false, new Error(`${sourceLabel} loaded but window.pinyinPro.pinyin is missing`));
                     }
                 };
 
-                script.onerror = event => {
-                    recordPinyinLoadAttempt(
-                        sourceLabel,
-                        'ERROR',
-                        event && event.type ? event.type : 'script error'
-                    );
+                script.onerror = () => {
                     finish(false, new Error(`${sourceLabel} script error`));
                 };
 
@@ -767,16 +736,8 @@
         }
 
         async function ensurePinyinProLoaded() {
+            if (registerPinyinFromGlobal('preloaded')) return true;
 
-            if (registerPinyinFromGlobal('preloaded')) {
-                recordPinyinLoadAttempt('preloaded', 'LOADED');
-                return true;
-            }
-
-            /*
-             * 官方文件示例使用 dist/index.js。
-             * 固定 3.28.1，並依序嘗試三個 CDN。
-             */
             const classicSources = [
                 {
                     label: 'jsDelivr index.js',
@@ -797,41 +758,19 @@
                     await loadPinyinClassicScript(source.url, source.label);
                     if (pinyinFn) return true;
                 } catch (error) {
-                    console.warn(
-                        `[pinyin-pro] ${source.label} 載入失敗：`,
-                        error
-                    );
+                    console.warn(`[pinyin-pro] ${source.label} 載入失敗：`, error);
                 }
             }
 
-            /*
-             * 最後嘗試 ESM，失敗也只記錄，不讓整頁程式崩掉。
-             */
             try {
-                const esmUrl =
-                    'https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.mjs';
-
-                recordPinyinLoadAttempt('jsDelivr ESM', 'START');
-
+                const esmUrl = 'https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.mjs';
                 const module = await import(esmUrl);
-
                 if (module && typeof module.pinyin === 'function') {
                     pinyinFn = module.pinyin;
                     pinyinLoadSource = 'jsDelivr ESM';
-                    recordPinyinLoadAttempt('jsDelivr ESM', 'LOADED');
                     return true;
                 }
-
-                recordPinyinLoadAttempt(
-                    'jsDelivr ESM',
-                    'MODULE_LOADED_BUT_PINYIN_MISSING'
-                );
             } catch (error) {
-                recordPinyinLoadAttempt(
-                    'jsDelivr ESM',
-                    'ERROR',
-                    error && error.message ? error.message : error
-                );
                 console.warn('[pinyin-pro] ESM fallback 載入失敗：', error);
             }
 
@@ -841,33 +780,14 @@
 
         function testPinyinEngine() {
             if (typeof pinyinFn !== 'function') {
-                return {
-                    ok: false,
-                    reason: 'pinyinFn is not a function'
-                };
+                return { ok: false, reason: 'pinyinFn is not a function' };
             }
-
             try {
-                const test = pinyinFn('皮卡丘', {
-                    toneType: 'none',
-                    type: 'array'
-                });
-
-                const result = Array.isArray(test)
-                    ? test.join(' ')
-                    : String(test || '');
-
-                return {
-                    ok: Boolean(result),
-                    result
-                };
+                const test = pinyinFn('皮卡丘', { toneType: 'none', type: 'array' });
+                const result = Array.isArray(test) ? test.join(' ') : String(test || '');
+                return { ok: Boolean(result), result };
             } catch (error) {
-                return {
-                    ok: false,
-                    reason: error && error.message
-                        ? error.message
-                        : String(error)
-                };
+                return { ok: false, reason: error && error.message ? error.message : String(error) };
             }
         }
 
@@ -884,27 +804,18 @@
                 refillQuestionBag();
                 loadRandomPokemon();
             } else {
-                setStatus(
-                    '⏳ 找不到題庫，請確認 dataset.js 是否正確載入。',
-                    'error'
-                );
+                setStatus('⏳ 找不到題庫，請確認 dataset.js 是否正確載入。', 'error');
             }
 
             if (!SpeechRecognition) {
-                setStatus(
-                    '⚠️ 目前瀏覽器不支援語音辨識，請改用支援的瀏覽器。',
-                    'error'
-                );
+                setStatus('⚠️ 目前瀏覽器不支援語音辨識，請改用支援的瀏覽器。', 'error');
                 micBtn.disabled = true;
                 micBtn.textContent = '🎤 不支援語音辨識';
                 return;
             }
 
             if (!pinyinReady || !pinyinHealth.ok) {
-                setStatus(
-                    '❌ 注音判分模組載入失敗。為避免把正確的同音答案誤判成 0 分，語音作答已暫停。請重新整理頁面後再試一次。',
-                    'error'
-                );
+                setStatus('❌ 注音判分模組載入失敗。為避免把正確的同音答案誤判成 0 分，語音作答已暫停。請重新整理頁面後再試一次。', 'error');
                 micBtn.disabled = true;
                 micBtn.textContent = '⚠️ 判分模組未載入';
                 return;
@@ -914,17 +825,9 @@
             micBtn.textContent = '🎤 按下說話';
 
             if (currentPokemon) {
-                setStatus(
-                    isReadingMode
-                        ? '請唸出上面的國字'
-                        : '請拼出上面的注音'
-                );
+                setStatus(isReadingMode ? '請唸出上面的國字' : '請拼出上面的注音');
             }
         });
-
-        /* =========================================================
-         * 畫面 / 題目
-         * ========================================================= */
 
         function generateZhuyinHTML(name, zhuyinArray) {
             let html = '';
@@ -934,10 +837,6 @@
                 const char = chars[i];
                 const bpmf = zhuyinArray[i] || '';
 
-                /*
-                 * ：、・、．等符號只顯示名稱本身。
-                 * 不建立 zhuyin-col，因此不會再看到「大冒號旁邊一個小冒號」。
-                 */
                 if (isSilentNameSymbol(char)) {
                     html += `
                         <div class="char-block symbol-only" aria-hidden="true">
@@ -947,10 +846,6 @@
                     continue;
                 }
 
-                /*
-                 * Ｑ、Ｚ、Ⅱ 等特殊名稱字元目前保留官方顯示，
-                 * 但 dataset 中並不是注音，因此不硬畫成「注音」。
-                 */
                 if (!isRealZhuyin(bpmf)) {
                     html += `
                         <div class="char-block symbol-only">
@@ -1002,6 +897,7 @@
 
         function applyPokemonQuestion(nextPokemon) {
             currentPokemon = nextPokemon;
+            updateAppCounters({ incrementQuestion: true });
 
             if (isReadingMode) {
                 bopomofoText.classList.add('hide-zhuyin');
@@ -1016,50 +912,27 @@
                 currentPokemon.zhuyin
             );
 
-            /*
-             * 只有在卡牌已經回到背面後才更換正面圖片。
-             * 這樣答案翻開時按「下一題」，不會在翻回去的途中閃出下一隻。
-             */
             pokemonImage.src = currentPokemon.image;
             pokemonImage.alt = currentPokemon.name;
-
-            /* 順便預載再下一題的圖片。 */
             preloadUpcomingImage();
         }
 
         function loadRandomPokemon() {
-            if (typeof pokemonDB === 'undefined' || pokemonDB.length === 0) {
-                return;
-            }
-
-            if (isChangingQuestion) {
-                return;
-            }
+            if (typeof pokemonDB === 'undefined' || pokemonDB.length === 0) return;
+            if (isChangingQuestion) return;
 
             cancelActiveRecognition('換題 / 切換模式', true);
 
             const nextPokemon = drawNextPokemon();
             const wasFlipped = card.classList.contains('flipped');
 
-            /*
-             * 如果卡牌本來就在背面，直接換題即可。
-             */
             if (!wasFlipped) {
                 card.classList.remove('flipped');
                 applyPokemonQuestion(nextPokemon);
                 return;
             }
 
-            /*
-             * 如果目前答案是翻開的：
-             * 1. 保留「舊題」圖片
-             * 2. 先把卡牌完整翻回背面
-             * 3. transform 動畫結束後才換成下一題
-             *
-             * Safari 偶爾可能漏掉 transitionend，因此另外加 950ms fallback。
-             */
             isChangingQuestion = true;
-
             let finished = false;
             let fallbackTimer = null;
 
@@ -1073,44 +946,26 @@
                 }
 
                 card.removeEventListener('transitionend', onCardTransitionEnd);
-
                 applyPokemonQuestion(nextPokemon);
                 isChangingQuestion = false;
 
-                /*
-                 * 使用者在翻牌期間按過麥克風：現在題目已安全切換完成，
-                 * 自動執行那次錄音要求。
-                 */
                 if (pendingMicStart) {
                     pendingMicStart = false;
                     setTimeout(() => {
-                        if (!isChangingQuestion) {
-                            startRecognition();
-                        }
+                        if (!isChangingQuestion) startRecognition();
                     }, 0);
                 }
             };
 
             const onCardTransitionEnd = (event) => {
-                if (event.target !== card || event.propertyName !== 'transform') {
-                    return;
-                }
-
+                if (event.target !== card || event.propertyName !== 'transform') return;
                 finishQuestionChange();
             };
 
             card.addEventListener('transitionend', onCardTransitionEnd);
             card.classList.remove('flipped');
-
-            fallbackTimer = setTimeout(
-                finishQuestionChange,
-                950
-            );
+            fallbackTimer = setTimeout(finishQuestionChange, 950);
         }
-
-        /* =========================================================
-         * 注音 / 拼音正規化
-         * ========================================================= */
 
         function normalizeZhuyinSyllable(value) {
             return String(value || '')
@@ -1120,38 +975,19 @@
         }
 
         function getTargetZhuyin(pokemon) {
-            if (!pokemon || !Array.isArray(pokemon.zhuyin)) {
-                return [];
-            }
-
+            if (!pokemon || !Array.isArray(pokemon.zhuyin)) return [];
             const chars = Array.from(String(pokemon.name || ''));
 
             return pokemon.zhuyin
                 .map((value, index) => {
                     const char = chars[index] || '';
-
-                    /* ：、・等無聲符號完全不參與發音答案。 */
-                    if (isSilentNameSymbol(char)) {
-                        return '';
-                    }
-
+                    if (isSilentNameSymbol(char)) return '';
                     const normalized = normalizeZhuyinSyllable(value);
-
-                    /*
-                     * Ｑ、Ｚ、Ⅱ 等不是注音字串：保留名稱顯示，但不讓它們
-                     * 被錯當成一個注音音節，避免莫名拉低相似度。
-                     */
                     return /[ㄅ-ㄩ]/.test(normalized) ? normalized : '';
                 })
                 .filter(Boolean);
         }
 
-        /*
-         * 將 pinyin-pro 產生的無聲調拼音，轉成無聲調注音。
-         *
-         * 這樣「標準答案」完全來自 dataset.js 的 zhuyin，
-         * 不再讓 pinyin-pro 重新猜寶可夢名稱的讀音。
-         */
         function pinyinSyllableToZhuyin(rawSyllable) {
             let syllable = String(rawSyllable || '')
                 .toLowerCase()
@@ -1159,109 +995,35 @@
                 .replace(/ü/g, 'v')
                 .replace(/[^a-zv]/g, '');
 
-            if (!syllable) {
-                return '';
-            }
+            if (!syllable) return '';
 
             const zeroInitialMap = {
-                yi: 'ㄧ',
-                ya: 'ㄧㄚ',
-                yo: 'ㄧㄛ',
-                ye: 'ㄧㄝ',
-                yai: 'ㄧㄞ',
-                yao: 'ㄧㄠ',
-                you: 'ㄧㄡ',
-                yan: 'ㄧㄢ',
-                yin: 'ㄧㄣ',
-                yang: 'ㄧㄤ',
-                ying: 'ㄧㄥ',
-                yong: 'ㄩㄥ',
-                yu: 'ㄩ',
-                yue: 'ㄩㄝ',
-                yuan: 'ㄩㄢ',
-                yun: 'ㄩㄣ',
-                wu: 'ㄨ',
-                wa: 'ㄨㄚ',
-                wo: 'ㄨㄛ',
-                wai: 'ㄨㄞ',
-                wei: 'ㄨㄟ',
-                wan: 'ㄨㄢ',
-                wen: 'ㄨㄣ',
-                wang: 'ㄨㄤ',
-                weng: 'ㄨㄥ'
+                yi: 'ㄧ', ya: 'ㄧㄚ', yo: 'ㄧㄛ', ye: 'ㄧㄝ', yai: 'ㄧㄞ',
+                yao: 'ㄧㄠ', you: 'ㄧㄡ', yan: 'ㄧㄢ', yin: 'ㄧㄣ', yang: 'ㄧㄤ',
+                ying: 'ㄧㄥ', yong: 'ㄩㄥ', yu: 'ㄩ', yue: 'ㄩㄝ', yuan: 'ㄩㄢ',
+                yun: 'ㄩㄣ', wu: 'ㄨ', wa: 'ㄨㄚ', wo: 'ㄨㄛ', wai: 'ㄨㄞ',
+                wei: 'ㄨㄟ', wan: 'ㄨㄢ', wen: 'ㄨㄣ', wang: 'ㄨㄤ', weng: 'ㄨㄥ'
             };
 
-            if (zeroInitialMap[syllable]) {
-                return zeroInitialMap[syllable];
-            }
+            if (zeroInitialMap[syllable]) return zeroInitialMap[syllable];
 
             const initialMap = {
-                zh: 'ㄓ',
-                ch: 'ㄔ',
-                sh: 'ㄕ',
-                b: 'ㄅ',
-                p: 'ㄆ',
-                m: 'ㄇ',
-                f: 'ㄈ',
-                d: 'ㄉ',
-                t: 'ㄊ',
-                n: 'ㄋ',
-                l: 'ㄌ',
-                g: 'ㄍ',
-                k: 'ㄎ',
-                h: 'ㄏ',
-                j: 'ㄐ',
-                q: 'ㄑ',
-                x: 'ㄒ',
-                r: 'ㄖ',
-                z: 'ㄗ',
-                c: 'ㄘ',
-                s: 'ㄙ'
+                zh: 'ㄓ', ch: 'ㄔ', sh: 'ㄕ',
+                b: 'ㄅ', p: 'ㄆ', m: 'ㄇ', f: 'ㄈ',
+                d: 'ㄉ', t: 'ㄊ', n: 'ㄋ', l: 'ㄌ',
+                g: 'ㄍ', k: 'ㄎ', h: 'ㄏ',
+                j: 'ㄐ', q: 'ㄑ', x: 'ㄒ',
+                r: 'ㄖ', z: 'ㄗ', c: 'ㄘ', s: 'ㄙ'
             };
 
             const finalMap = {
-                a: 'ㄚ',
-                o: 'ㄛ',
-                e: 'ㄜ',
-                ai: 'ㄞ',
-                ei: 'ㄟ',
-                ao: 'ㄠ',
-                ou: 'ㄡ',
-                an: 'ㄢ',
-                en: 'ㄣ',
-                ang: 'ㄤ',
-                eng: 'ㄥ',
-                er: 'ㄦ',
-
-                i: 'ㄧ',
-                ia: 'ㄧㄚ',
-                ie: 'ㄧㄝ',
-                iao: 'ㄧㄠ',
-                iu: 'ㄧㄡ',
-                iou: 'ㄧㄡ',
-                ian: 'ㄧㄢ',
-                in: 'ㄧㄣ',
-                iang: 'ㄧㄤ',
-                ing: 'ㄧㄥ',
-                iong: 'ㄩㄥ',
-
-                u: 'ㄨ',
-                ua: 'ㄨㄚ',
-                uo: 'ㄨㄛ',
-                uai: 'ㄨㄞ',
-                ui: 'ㄨㄟ',
-                uei: 'ㄨㄟ',
-                uan: 'ㄨㄢ',
-                un: 'ㄨㄣ',
-                uen: 'ㄨㄣ',
-                uang: 'ㄨㄤ',
-                ong: 'ㄨㄥ',
-                ueng: 'ㄨㄥ',
-
-                v: 'ㄩ',
-                ve: 'ㄩㄝ',
-                van: 'ㄩㄢ',
-                vn: 'ㄩㄣ'
+                a: 'ㄚ', o: 'ㄛ', e: 'ㄜ', ai: 'ㄞ', ei: 'ㄟ', ao: 'ㄠ', ou: 'ㄡ',
+                an: 'ㄢ', en: 'ㄣ', ang: 'ㄤ', eng: 'ㄥ', er: 'ㄦ',
+                i: 'ㄧ', ia: 'ㄧㄚ', ie: 'ㄧㄝ', iao: 'ㄧㄠ', iu: 'ㄧㄡ', iou: 'ㄧㄡ',
+                ian: 'ㄧㄢ', in: 'ㄧㄣ', iang: 'ㄧㄤ', ing: 'ㄧㄥ', iong: 'ㄩㄥ',
+                u: 'ㄨ', ua: 'ㄨㄚ', uo: 'ㄨㄛ', uai: 'ㄨㄞ', ui: 'ㄨㄟ', uei: 'ㄨㄟ',
+                uan: 'ㄨㄢ', un: 'ㄨㄣ', uen: 'ㄨㄣ', uang: 'ㄨㄤ', ong: 'ㄨㄥ', ueng: 'ㄨㄥ',
+                v: 'ㄩ', ve: 'ㄩㄝ', van: 'ㄩㄢ', vn: 'ㄩㄣ'
             };
 
             let initial = '';
@@ -1280,15 +1042,10 @@
                 rest = syllable.slice(1);
             }
 
-            /* ㄓ ㄔ ㄕ ㄖ ㄗ ㄘ ㄙ 的「i」不另外寫 ㄧ */
-            if (
-                rest === 'i' &&
-                ['zh', 'ch', 'sh', 'r', 'z', 'c', 's'].includes(initial)
-            ) {
+            if (rest === 'i' && ['zh', 'ch', 'sh', 'r', 'z', 'c', 's'].includes(initial)) {
                 return initialMap[initial] || '';
             }
 
-            /* ju / qu / xu 的 u 實際代表 ㄩ */
             if (['j', 'q', 'x'].includes(initial)) {
                 if (rest === 'u') rest = 'v';
                 else if (rest === 'ue') rest = 've';
@@ -1299,15 +1056,8 @@
             const initialZhuyin = initialMap[initial] || '';
             const finalZhuyin = finalMap[rest] || '';
 
-            if (!initial && finalZhuyin) {
-                return finalZhuyin;
-            }
-
-            if (initialZhuyin && (finalZhuyin || rest === '')) {
-                return initialZhuyin + finalZhuyin;
-            }
-
-            console.warn('無法轉換拼音音節：', rawSyllable);
+            if (!initial && finalZhuyin) return finalZhuyin;
+            if (initialZhuyin && (finalZhuyin || rest === '')) return initialZhuyin + finalZhuyin;
             return '';
         }
 
@@ -1325,224 +1075,121 @@
         }
 
         function recognizedTextToZhuyin(text) {
-            if (!pinyinFn || !text) {
-                return [];
-            }
-
+            if (!pinyinFn || !text) return [];
             try {
                 const pinyinArray = pinyinFn(text, {
                     toneType: 'none',
                     type: 'array',
-                    /* Q / Z / 數字等非中文字不轉成假注音。 */
                     nonZh: 'removed'
                 });
-
-                return pinyinArray
-                    .map(item => pinyinSyllableToZhuyin(item))
-                    .filter(Boolean);
+                return pinyinArray.map(item => pinyinSyllableToZhuyin(item)).filter(Boolean);
             } catch (error) {
                 console.warn('辨識文字轉注音失敗：', error);
                 return [];
             }
         }
 
-        /* =========================================================
-         * 相似度
-         * ========================================================= */
-
         function levenshteinDistance(a, b) {
             a = String(a || '');
             b = String(b || '');
-
             if (a === b) return 0;
             if (!a.length) return b.length;
             if (!b.length) return a.length;
 
             const previous = new Array(b.length + 1);
             const current = new Array(b.length + 1);
-
-            for (let j = 0; j <= b.length; j++) {
-                previous[j] = j;
-            }
+            for (let j = 0; j <= b.length; j++) previous[j] = j;
 
             for (let i = 1; i <= a.length; i++) {
                 current[0] = i;
-
                 for (let j = 1; j <= b.length; j++) {
                     const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-
-                    current[j] = Math.min(
-                        current[j - 1] + 1,
-                        previous[j] + 1,
-                        previous[j - 1] + cost
-                    );
+                    current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + cost);
                 }
-
-                for (let j = 0; j <= b.length; j++) {
-                    previous[j] = current[j];
-                }
+                for (let j = 0; j <= b.length; j++) previous[j] = current[j];
             }
-
             return previous[b.length];
         }
 
         function stringSimilarity(a, b) {
             a = String(a || '');
             b = String(b || '');
-
             if (!a && !b) return 100;
             if (!a || !b) return 0;
             if (a === b) return 100;
-
             const maxLength = Math.max(a.length, b.length);
             const distance = levenshteinDistance(a, b);
-
             return Math.max(0, (1 - distance / maxLength) * 100);
         }
 
-        /*
-         * 注音音節拆解：
-         * 聲母只有第一個符號；其餘視為韻母/介音組合。
-         * 這裡不處理聲調，因為 normalizeZhuyinSyllable() 已經移除聲調。
-         */
         const ZHUYIN_INITIALS = new Set([
-            'ㄅ', 'ㄆ', 'ㄇ', 'ㄈ',
-            'ㄉ', 'ㄊ', 'ㄋ', 'ㄌ',
-            'ㄍ', 'ㄎ', 'ㄏ',
-            'ㄐ', 'ㄑ', 'ㄒ',
-            'ㄓ', 'ㄔ', 'ㄕ', 'ㄖ',
-            'ㄗ', 'ㄘ', 'ㄙ'
+            'ㄅ', 'ㄆ', 'ㄇ', 'ㄈ', 'ㄉ', 'ㄊ', 'ㄋ', 'ㄌ',
+            'ㄍ', 'ㄎ', 'ㄏ', 'ㄐ', 'ㄑ', 'ㄒ', 'ㄓ', 'ㄔ',
+            'ㄕ', 'ㄖ', 'ㄗ', 'ㄘ', 'ㄙ'
         ]);
 
-        /*
-         * 只列「語音辨識服務很常互相轉寫」的近音。
-         * 這不是把它們當作完全相同；只有在長名稱且只錯這一個音節時才可能救援。
-         */
         const CLOSE_INITIAL_GROUPS = [
-            new Set(['ㄓ', 'ㄗ']),
-            new Set(['ㄔ', 'ㄘ']),
-            new Set(['ㄕ', 'ㄙ']),
-            new Set(['ㄋ', 'ㄌ']),
-            new Set(['ㄌ', 'ㄖ']),
-            new Set(['ㄐ', 'ㄑ']),
+            new Set(['ㄓ', 'ㄗ']), new Set(['ㄔ', 'ㄘ']), new Set(['ㄕ', 'ㄙ']),
+            new Set(['ㄋ', 'ㄌ']), new Set(['ㄌ', 'ㄖ']), new Set(['ㄐ', 'ㄑ']),
             new Set(['ㄑ', 'ㄒ'])
         ];
 
         const CLOSE_FINAL_GROUPS = [
-            new Set(['ㄣ', 'ㄥ']),
-            new Set(['ㄢ', 'ㄤ']),
-            new Set(['ㄧㄣ', 'ㄧㄥ'])
+            new Set(['ㄣ', 'ㄥ']), new Set(['ㄢ', 'ㄤ']), new Set(['ㄧㄣ', 'ㄧㄥ'])
         ];
 
         function splitZhuyinSyllable(value) {
             const syllable = normalizeZhuyinSyllable(value);
-            if (!syllable) {
-                return { initial: '', final: '' };
-            }
-
+            if (!syllable) return { initial: '', final: '' };
             const first = syllable[0];
             if (ZHUYIN_INITIALS.has(first)) {
-                return {
-                    initial: first,
-                    final: syllable.slice(1)
-                };
+                return { initial: first, final: syllable.slice(1) };
             }
-
-            return {
-                initial: '',
-                final: syllable
-            };
+            return { initial: '', final: syllable };
         }
 
         function inSameCloseGroup(a, b, groups) {
             if (!a || !b || a === b) return false;
-
             return groups.some(group => group.has(a) && group.has(b));
         }
 
         function isConservativeCloseSyllable(a, b) {
             a = normalizeZhuyinSyllable(a);
             b = normalizeZhuyinSyllable(b);
-
-            if (!a || !b || a === b) {
-                return false;
-            }
+            if (!a || !b || a === b) return false;
 
             const left = splitZhuyinSyllable(a);
             const right = splitZhuyinSyllable(b);
 
-            /*
-             * Case A：韻母完全相同，只差一組常見近音聲母。
-             * 例：ㄑㄧㄡ / ㄐㄧㄡ
-             */
-            if (
-                left.final &&
-                left.final === right.final &&
-                inSameCloseGroup(left.initial, right.initial, CLOSE_INITIAL_GROUPS)
-            ) {
+            if (left.final && left.final === right.final && inSameCloseGroup(left.initial, right.initial, CLOSE_INITIAL_GROUPS)) {
                 return true;
             }
-
-            /*
-             * Case B：聲母完全相同，只差一組常見近音韻母。
-             * 例：ㄌㄧㄣ / ㄌㄧㄥ（是否救援仍要通過整題的嚴格條件）
-             */
-            if (
-                left.initial === right.initial &&
-                inSameCloseGroup(left.final, right.final, CLOSE_FINAL_GROUPS)
-            ) {
+            if (left.initial === right.initial && inSameCloseGroup(left.final, right.final, CLOSE_FINAL_GROUPS)) {
                 return true;
             }
-
             return false;
         }
 
         function zhuyinSequenceScore(spokenZhuyin, targetZhuyin) {
-            if (!spokenZhuyin.length || !targetZhuyin.length) {
-                return 0;
-            }
-
+            if (!spokenZhuyin.length || !targetZhuyin.length) return 0;
             const spokenJoined = spokenZhuyin.join('');
             const targetJoined = targetZhuyin.join('');
             const wholeStringScore = stringSimilarity(spokenJoined, targetJoined);
             const maxCount = Math.max(spokenZhuyin.length, targetZhuyin.length);
 
             let syllableTotal = 0;
-
             for (let i = 0; i < maxCount; i++) {
-                syllableTotal += stringSimilarity(
-                    spokenZhuyin[i] || '',
-                    targetZhuyin[i] || ''
-                );
+                syllableTotal += stringSimilarity(spokenZhuyin[i] || '', targetZhuyin[i] || '');
             }
-
             const syllableScore = syllableTotal / maxCount;
-
-            /*
-             * 仍維持既有 70% 每音節 + 30% 整體的核心分數。
-             * 近音救援不直接混進這個分數，避免整體判分全面變鬆。
-             */
-            return Math.round(
-                syllableScore * 0.7 +
-                wholeStringScore * 0.3
-            );
+            return Math.round(syllableScore * 0.7 + wholeStringScore * 0.3);
         }
 
         function analyzeConservativePhoneticRescue(bestWindow, targetZhuyin) {
             const targetLength = targetZhuyin.length;
-
-            /*
-             * 兩音節名稱錯一個音就等於錯一半，因此完全不使用近音救援。
-             * 至少三音節才有資格。
-             */
-            if (
-                targetLength < 3 ||
-                bestWindow.length !== targetLength
-            ) {
+            if (targetLength < 3 || bestWindow.length !== targetLength) {
                 return {
-                    eligible: false,
-                    exactCount: 0,
-                    closeCount: 0,
+                    eligible: false, exactCount: 0, closeCount: 0,
                     mismatchCount: Math.max(bestWindow.length, targetLength)
                 };
             }
@@ -1554,63 +1201,28 @@
             for (let i = 0; i < targetLength; i++) {
                 const spoken = normalizeZhuyinSyllable(bestWindow[i]);
                 const target = normalizeZhuyinSyllable(targetZhuyin[i]);
-
                 if (spoken === target) {
                     exactCount++;
                     continue;
                 }
-
                 mismatchCount++;
-
-                if (isConservativeCloseSyllable(spoken, target)) {
-                    closeCount++;
-                }
+                if (isConservativeCloseSyllable(spoken, target)) closeCount++;
             }
 
-            /*
-             * 最嚴格條件：
-             * - 只有 1 個音節不同
-             * - 那 1 個必須是已知近音
-             * - 其他所有音節完全一致
-             */
-            const eligible =
-                mismatchCount === 1 &&
-                closeCount === 1 &&
-                exactCount === targetLength - 1;
-
-            return {
-                eligible,
-                exactCount,
-                closeCount,
-                mismatchCount
-            };
+            const eligible = mismatchCount === 1 && closeCount === 1 && exactCount === targetLength - 1;
+            return { eligible, exactCount, closeCount, mismatchCount };
         }
 
         function getBestZhuyinScore(spokenZhuyin, targetZhuyin) {
-            if (!spokenZhuyin.length || !targetZhuyin.length) {
-                return {
-                    score: 0,
-                    bestWindow: []
-                };
-            }
-
+            if (!spokenZhuyin.length || !targetZhuyin.length) return { score: 0, bestWindow: [] };
             const targetLength = targetZhuyin.length;
             let bestScore = 0;
             let bestWindow = spokenZhuyin;
 
-            /*
-             * 容許使用者說「答案是皮卡丘」、「我猜皮卡丘」等句型。
-             * 如果辨識句子比較長，就找其中最像答案的一段。
-             */
             if (spokenZhuyin.length >= targetLength) {
-                for (
-                    let start = 0;
-                    start <= spokenZhuyin.length - targetLength;
-                    start++
-                ) {
+                for (let start = 0; start <= spokenZhuyin.length - targetLength; start++) {
                     const window = spokenZhuyin.slice(start, start + targetLength);
                     const score = zhuyinSequenceScore(window, targetZhuyin);
-
                     if (score > bestScore) {
                         bestScore = score;
                         bestWindow = window;
@@ -1619,11 +1231,7 @@
             } else {
                 bestScore = zhuyinSequenceScore(spokenZhuyin, targetZhuyin);
             }
-
-            return {
-                score: Math.round(bestScore),
-                bestWindow
-            };
+            return { score: Math.round(bestScore), bestWindow };
         }
 
         function evaluateTranscript(transcript, pokemon) {
@@ -1632,58 +1240,30 @@
 
             if (!cleanText) {
                 return {
-                    transcript,
-                    cleanText,
-                    score: 0,
-                    rawScore: 0,
-                    spokenZhuyin: [],
-                    targetZhuyin,
-                    bestWindow: [],
-                    exactTextMatch: false,
-                    exactZhuyinMatch: false,
-                    phoneticRescue: false,
-                    matchType: 'empty'
+                    transcript, cleanText, score: 0, rawScore: 0,
+                    spokenZhuyin: [], targetZhuyin, bestWindow: [],
+                    exactTextMatch: false, exactZhuyinMatch: false,
+                    phoneticRescue: false, matchType: 'empty'
                 };
             }
 
-            /*
-             * 如果語音服務直接辨識出了正確寶可夢名稱，
-             * 或句子裡包含正確名稱，直接視為 100。
-             */
             const normalizedTargetName = normalizeNameForComparison(pokemon.name);
-
-            if (
-                normalizedTargetName &&
-                cleanText.includes(normalizedTargetName)
-            ) {
+            if (normalizedTargetName && cleanText.includes(normalizedTargetName)) {
                 return {
-                    transcript,
-                    cleanText,
-                    score: 100,
-                    rawScore: 100,
+                    transcript, cleanText, score: 100, rawScore: 100,
                     spokenZhuyin: recognizedTextToZhuyin(cleanText),
-                    targetZhuyin,
-                    bestWindow: targetZhuyin,
-                    exactTextMatch: true,
-                    exactZhuyinMatch: true,
-                    phoneticRescue: false,
-                    matchType: 'exact-text'
+                    targetZhuyin, bestWindow: targetZhuyin,
+                    exactTextMatch: true, exactZhuyinMatch: true,
+                    phoneticRescue: false, matchType: 'exact-text'
                 };
             }
 
             if (!pinyinFn) {
                 return {
-                    transcript,
-                    cleanText,
-                    score: 0,
-                    rawScore: 0,
-                    spokenZhuyin: [],
-                    targetZhuyin,
-                    bestWindow: [],
-                    exactTextMatch: false,
-                    exactZhuyinMatch: false,
-                    phoneticRescue: false,
-                    matchType: 'pinyin-unavailable'
+                    transcript, cleanText, score: 0, rawScore: 0,
+                    spokenZhuyin: [], targetZhuyin, bestWindow: [],
+                    exactTextMatch: false, exactZhuyinMatch: false,
+                    phoneticRescue: false, matchType: 'pinyin-unavailable'
                 };
             }
 
@@ -1693,61 +1273,30 @@
             const exactZhuyinMatch =
                 result.bestWindow.length === targetZhuyin.length &&
                 targetZhuyin.length > 0 &&
-                result.bestWindow.every(
-                    (value, index) =>
-                        normalizeZhuyinSyllable(value) ===
-                        normalizeZhuyinSyllable(targetZhuyin[index])
+                result.bestWindow.every((value, index) =>
+                    normalizeZhuyinSyllable(value) === normalizeZhuyinSyllable(targetZhuyin[index])
                 );
 
             if (exactZhuyinMatch) {
                 return {
-                    transcript,
-                    cleanText,
-                    score: 100,
-                    rawScore: result.score,
-                    spokenZhuyin,
-                    targetZhuyin,
-                    bestWindow: result.bestWindow,
-                    exactTextMatch: false,
-                    exactZhuyinMatch: true,
-                    phoneticRescue: false,
-                    matchType: 'exact-zhuyin'
+                    transcript, cleanText, score: 100, rawScore: result.score,
+                    spokenZhuyin, targetZhuyin, bestWindow: result.bestWindow,
+                    exactTextMatch: false, exactZhuyinMatch: true,
+                    phoneticRescue: false, matchType: 'exact-zhuyin'
                 };
             }
 
-            const rescue = analyzeConservativePhoneticRescue(
-                result.bestWindow,
-                targetZhuyin
-            );
-
-            /*
-             * 近音救援固定只拉到 91：
-             * 足以跨過 90 的正確門檻，但不偽裝成 100 分。
-             * 且只有非常嚴格的「長名稱只差一個已知近音」才會觸發。
-             */
-            const finalScore = rescue.eligible
-                ? Math.max(result.score, 91)
-                : result.score;
+            const rescue = analyzeConservativePhoneticRescue(result.bestWindow, targetZhuyin);
+            const finalScore = rescue.eligible ? Math.max(result.score, 91) : result.score;
 
             return {
-                transcript,
-                cleanText,
-                score: finalScore,
-                rawScore: result.score,
-                spokenZhuyin,
-                targetZhuyin,
-                bestWindow: result.bestWindow,
-                exactTextMatch: false,
-                exactZhuyinMatch: false,
-                phoneticRescue: rescue.eligible,
-                phoneticDetails: rescue,
+                transcript, cleanText, score: finalScore, rawScore: result.score,
+                spokenZhuyin, targetZhuyin, bestWindow: result.bestWindow,
+                exactTextMatch: false, exactZhuyinMatch: false,
+                phoneticRescue: rescue.eligible, phoneticDetails: rescue,
                 matchType: rescue.eligible ? 'phonetic-rescue' : 'similarity'
             };
         }
-
-        /* =========================================================
-         * SpeechRecognition Session - V16 Production
-         * ========================================================= */
 
         function isCurrentSession(session) {
             return activeSession === session;
@@ -1755,17 +1304,10 @@
 
         function clearSessionTimers(session) {
             if (!session) return;
-
             [
-                'preSpeechTimer',
-                'recordingTimer',
-                'speechEndTimer',
-                'audioStopWatchdogTimer',
-                'resultWaitTimer',
-                'endGraceTimer',
-                'hardLimitTimer',
-                'abortSettleTimer',
-                'earlyDecisionTimer'
+                'preSpeechTimer', 'recordingTimer', 'speechEndTimer',
+                'audioStopWatchdogTimer', 'resultWaitTimer', 'endGraceTimer',
+                'hardLimitTimer', 'abortSettleTimer', 'earlyDecisionTimer'
             ].forEach(key => {
                 clearTimeout(session[key]);
                 session[key] = null;
@@ -1780,121 +1322,74 @@
 
         function addCandidate(session, candidate) {
             if (!session || !candidate || !candidate.transcript) return;
-
             const transcript = String(candidate.transcript).trim();
             const key = normalizeCandidateKey(transcript);
             if (!key) return;
 
             let entry = session.candidateMap.get(key);
-
             if (!entry) {
                 entry = {
-                    transcript,
-                    sources: new Set(),
-                    seenCount: 0,
-                    finalSeen: false,
-                    interimSeen: false,
-                    bestConfidence: null
+                    transcript, sources: new Set(), seenCount: 0,
+                    finalSeen: false, interimSeen: false, bestConfidence: null
                 };
                 session.candidateMap.set(key, entry);
             }
 
             entry.seenCount++;
             entry.sources.add(candidate.source || 'UNKNOWN');
-
             if (candidate.isFinal) entry.finalSeen = true;
             if (candidate.isInterim) entry.interimSeen = true;
 
-            if (
-                typeof candidate.confidence === 'number' &&
-                (
-                    entry.bestConfidence === null ||
-                    candidate.confidence > entry.bestConfidence
-                )
-            ) {
+            if (typeof candidate.confidence === 'number' &&
+                (entry.bestConfidence === null || candidate.confidence > entry.bestConfidence)) {
                 entry.bestConfidence = candidate.confidence;
             }
         }
 
         function buildFullUtteranceCandidates(event) {
-            if (!event || !event.results || !event.results.length) {
-                return [];
-            }
+            if (!event || !event.results || !event.results.length) return [];
 
-            let beams = [{
-                transcript: '',
-                confidenceTotal: 0,
-                confidenceCount: 0,
-                rankPenalty: 0
-            }];
-
+            let beams = [{ transcript: '', confidenceTotal: 0, confidenceCount: 0, rankPenalty: 0 }];
             let allFinal = true;
             let anyResult = false;
 
             for (let r = 0; r < event.results.length; r++) {
                 const result = event.results[r];
                 if (!result || !result.length) continue;
-
                 anyResult = true;
                 if (!result.isFinal) allFinal = false;
 
                 const alternatives = [];
-
                 for (let i = 0; i < result.length && i < MAX_ALTERNATIVES; i++) {
                     const alt = result[i];
-                    const transcript =
-                        alt && alt.transcript
-                            ? alt.transcript.trim()
-                            : '';
-
+                    const transcript = alt && alt.transcript ? alt.transcript.trim() : '';
                     if (!transcript) continue;
-
                     alternatives.push({
                         transcript,
-                        confidence:
-                            typeof alt.confidence === 'number'
-                                ? alt.confidence
-                                : null,
+                        confidence: typeof alt.confidence === 'number' ? alt.confidence : null,
                         rank: i
                     });
                 }
 
                 if (!alternatives.length) continue;
-
                 const next = [];
 
                 for (const beam of beams) {
                     for (const alt of alternatives) {
-                        const hasConfidence =
-                            typeof alt.confidence === 'number';
-
+                        const hasConfidence = typeof alt.confidence === 'number';
                         next.push({
-                            transcript:
-                                `${beam.transcript} ${alt.transcript}`.trim(),
-                            confidenceTotal:
-                                beam.confidenceTotal +
-                                (hasConfidence ? alt.confidence : 0),
-                            confidenceCount:
-                                beam.confidenceCount +
-                                (hasConfidence ? 1 : 0),
-                            rankPenalty:
-                                beam.rankPenalty + alt.rank
+                            transcript: `${beam.transcript} ${alt.transcript}`.trim(),
+                            confidenceTotal: beam.confidenceTotal + (hasConfidence ? alt.confidence : 0),
+                            confidenceCount: beam.confidenceCount + (hasConfidence ? 1 : 0),
+                            rankPenalty: beam.rankPenalty + alt.rank
                         });
                     }
                 }
 
                 next.sort((a, b) => {
-                    if (a.rankPenalty !== b.rankPenalty) {
-                        return a.rankPenalty - b.rankPenalty;
-                    }
-
-                    const ac = a.confidenceCount
-                        ? a.confidenceTotal / a.confidenceCount
-                        : 0;
-                    const bc = b.confidenceCount
-                        ? b.confidenceTotal / b.confidenceCount
-                        : 0;
-
+                    if (a.rankPenalty !== b.rankPenalty) return a.rankPenalty - b.rankPenalty;
+                    const ac = a.confidenceCount ? a.confidenceTotal / a.confidenceCount : 0;
+                    const bc = b.confidenceCount ? b.confidenceTotal / b.confidenceCount : 0;
                     return bc - ac;
                 });
 
@@ -1905,10 +1400,7 @@
 
             return beams.map(beam => ({
                 transcript: beam.transcript,
-                confidence:
-                    beam.confidenceCount
-                        ? beam.confidenceTotal / beam.confidenceCount
-                        : null,
+                confidence: beam.confidenceCount ? beam.confidenceTotal / beam.confidenceCount : null,
                 source: allFinal ? 'FULL_FINAL' : 'FULL_MIXED',
                 isFinal: allFinal,
                 isInterim: !allFinal
@@ -1919,37 +1411,19 @@
             if (!session || session.finished || session.cancelled) return;
 
             if (event && event.results) {
-                for (
-                    let resultIndex = 0;
-                    resultIndex < event.results.length;
-                    resultIndex++
-                ) {
+                for (let resultIndex = 0; resultIndex < event.results.length; resultIndex++) {
                     const result = event.results[resultIndex];
                     if (!result) continue;
 
-                    for (
-                        let i = 0;
-                        i < result.length && i < MAX_ALTERNATIVES;
-                        i++
-                    ) {
+                    for (let i = 0; i < result.length && i < MAX_ALTERNATIVES; i++) {
                         const alt = result[i];
-                        const transcript =
-                            alt && alt.transcript
-                                ? alt.transcript.trim()
-                                : '';
-
+                        const transcript = alt && alt.transcript ? alt.transcript.trim() : '';
                         if (!transcript) continue;
 
                         addCandidate(session, {
                             transcript,
-                            confidence:
-                                typeof alt.confidence === 'number'
-                                    ? alt.confidence
-                                    : null,
-                            source:
-                                result.isFinal
-                                    ? 'FINAL_SEGMENT'
-                                    : 'INTERIM_SEGMENT',
+                            confidence: typeof alt.confidence === 'number' ? alt.confidence : null,
+                            source: result.isFinal ? 'FINAL_SEGMENT' : 'INTERIM_SEGMENT',
                             isFinal: Boolean(result.isFinal),
                             isInterim: !result.isFinal
                         });
@@ -1957,19 +1431,13 @@
                 }
             }
 
-            buildFullUtteranceCandidates(event)
-                .forEach(candidate => addCandidate(session, candidate));
+            buildFullUtteranceCandidates(event).forEach(candidate => addCandidate(session, candidate));
         }
 
         function evaluateSessionCandidates(session) {
             const rows = [];
-
             for (const entry of session.candidateMap.values()) {
-                const evaluation = evaluateTranscript(
-                    entry.transcript,
-                    session.targetPokemon
-                );
-
+                const evaluation = evaluateTranscript(entry.transcript, session.targetPokemon);
                 rows.push({
                     ...evaluation,
                     sources: Array.from(entry.sources),
@@ -1982,35 +1450,10 @@
 
             rows.sort((a, b) => {
                 if (b.score !== a.score) return b.score - a.score;
-
-                if (
-                    Number(b.exactTextMatch) !==
-                    Number(a.exactTextMatch)
-                ) {
-                    return (
-                        Number(b.exactTextMatch) -
-                        Number(a.exactTextMatch)
-                    );
-                }
-
-                if (
-                    Number(b.exactZhuyinMatch) !==
-                    Number(a.exactZhuyinMatch)
-                ) {
-                    return (
-                        Number(b.exactZhuyinMatch) -
-                        Number(a.exactZhuyinMatch)
-                    );
-                }
-
-                if (Number(b.finalSeen) !== Number(a.finalSeen)) {
-                    return Number(b.finalSeen) - Number(a.finalSeen);
-                }
-
-                if (b.seenCount !== a.seenCount) {
-                    return b.seenCount - a.seenCount;
-                }
-
+                if (Number(b.exactTextMatch) !== Number(a.exactTextMatch)) return Number(b.exactTextMatch) - Number(a.exactTextMatch);
+                if (Number(b.exactZhuyinMatch) !== Number(a.exactZhuyinMatch)) return Number(b.exactZhuyinMatch) - Number(a.exactZhuyinMatch);
+                if (Number(b.finalSeen) !== Number(a.finalSeen)) return Number(b.finalSeen) - Number(a.finalSeen);
+                if (b.seenCount !== a.seenCount) return b.seenCount - a.seenCount;
                 return (b.confidence || 0) - (a.confidence || 0);
             });
 
@@ -2018,327 +1461,133 @@
         }
 
         function selectSessionEvidence(session, evaluations) {
-            if (!evaluations.length) {
-                return {
-                    selected: null,
-                    reason: 'NO_CANDIDATE'
-                };
-            }
+            if (!evaluations.length) return { selected: null, reason: 'NO_CANDIDATE' };
 
             const exactStrong = evaluations.find(item =>
-                (item.exactTextMatch || item.exactZhuyinMatch) &&
-                (item.finalSeen || item.seenCount >= 2)
+                (item.exactTextMatch || item.exactZhuyinMatch) && (item.finalSeen || item.seenCount >= 2)
             );
-
             if (exactStrong) {
                 return {
                     selected: exactStrong,
-                    reason:
-                        exactStrong.exactTextMatch
-                            ? 'EXACT_TEXT_CONFIRMED'
-                            : 'EXACT_ZHUYIN_CONFIRMED'
+                    reason: exactStrong.exactTextMatch ? 'EXACT_TEXT_CONFIRMED' : 'EXACT_ZHUYIN_CONFIRMED'
                 };
             }
 
-            const bestFinal =
-                evaluations.find(item => item.finalSeen) || null;
-
-            if (
-                bestFinal &&
-                bestFinal.score >= SCORE_CORRECT
-            ) {
-                return {
-                    selected: bestFinal,
-                    reason: 'BEST_FINAL_OVER_THRESHOLD'
-                };
+            const bestFinal = evaluations.find(item => item.finalSeen) || null;
+            if (bestFinal && bestFinal.score >= SCORE_CORRECT) {
+                return { selected: bestFinal, reason: 'BEST_FINAL_OVER_THRESHOLD' };
             }
 
             const best = evaluations[0];
-
-            const stableHighCandidate =
-                best.score >= SCORE_CORRECT &&
-                (
-                    best.seenCount >= 2 ||
-                    (
-                        bestFinal &&
-                        bestFinal.score >= SCORE_CLOSE
-                    )
-                );
+            const stableHighCandidate = best.score >= SCORE_CORRECT &&
+                (best.seenCount >= 2 || (bestFinal && bestFinal.score >= SCORE_CLOSE));
 
             if (stableHighCandidate) {
-                return {
-                    selected: best,
-                    reason: 'SESSION_POOL_HIGH_CONFIDENCE'
-                };
+                return { selected: best, reason: 'SESSION_POOL_HIGH_CONFIDENCE' };
             }
 
             return {
                 selected: bestFinal || best,
-                reason:
-                    bestFinal
-                        ? 'BEST_FINAL_BELOW_THRESHOLD'
-                        : 'BEST_AVAILABLE_BELOW_THRESHOLD'
+                reason: bestFinal ? 'BEST_FINAL_BELOW_THRESHOLD' : 'BEST_AVAILABLE_BELOW_THRESHOLD'
             };
         }
 
         function applyFinalDecision(session, selected, reason) {
-            if (
-                !session ||
-                session.resultHandled ||
-                session.cancelled
-            ) {
-                return false;
-            }
+            if (!session || session.resultHandled || session.cancelled) return false;
 
             session.resultHandled = true;
             session.userMessageHandled = true;
             session.resultSource = reason;
 
             if (!selected) {
-                setStatus(
-                    '⏸️ 沒有收到可判斷的語音文字，請再試一次。',
-                    'retry'
-                );
+                setStatus('⏸️ 沒有收到可判斷的語音文字，請再試一次。', 'retry');
                 return true;
             }
 
-            const success =
-                currentPokemon === session.targetPokemon &&
-                selected.score >= SCORE_CORRECT;
+            const success = currentPokemon === session.targetPokemon && selected.score >= SCORE_CORRECT;
 
             if (success) {
-                setStatus(
-                    `🎉 太棒了！答案是「${session.targetPokemon.name}」！`,
-                    'success'
-                );
+                setStatus(`🎉 太棒了！答案是「${session.targetPokemon.name}」！`, 'success');
                 revealAnswer();
+                updateAppCounters({ addStar: true });
             } else if (selected.score >= SCORE_CLOSE) {
-                setStatus(
-                    '😊 差一點點，再試一次！',
-                    'close'
-                );
+                setStatus('😊 差一點點，再試一次！', 'close');
             } else {
-                setStatus(
-                    isReadingMode
-                        ? '💪 糟糕，再試著唸一次唷！'
-                        : '💪 糟糕，再試著拼一次唷！',
-                    'retry'
-                );
+                setStatus(isReadingMode ? '💪 糟糕，再試著唸一次唷！' : '💪 糟糕，再試著拼一次唷！', 'retry');
             }
 
             return true;
         }
 
-        function finalizeRecognitionDecision(
-            session,
-            reason = 'session finalize'
-        ) {
-            if (
-                !session ||
-                session.resultHandled ||
-                session.cancelled
-            ) {
-                return false;
-            }
-
-            const evaluations =
-                evaluateSessionCandidates(session);
-
-            const selection =
-                selectSessionEvidence(session, evaluations);
-
-            return applyFinalDecision(
-                session,
-                selection.selected,
-                selection.reason
-            );
+        function finalizeRecognitionDecision(session, reason = 'session finalize') {
+            if (!session || session.resultHandled || session.cancelled) return false;
+            const evaluations = evaluateSessionCandidates(session);
+            const selection = selectSessionEvidence(session, evaluations);
+            return applyFinalDecision(session, selection.selected, selection.reason);
         }
 
-        /*
-         * V16 Fast Decision
-         * 有把握就提早判；不確定才繼續聽。
-         */
         function getBestFinalEvaluation(session) {
-            const evaluations =
-                evaluateSessionCandidates(session);
-
-            const bestFinal =
-                evaluations.find(item => item.finalSeen) || null;
-
-            return {
-                evaluations,
-                bestFinal
-            };
+            const evaluations = evaluateSessionCandidates(session);
+            const bestFinal = evaluations.find(item => item.finalSeen) || null;
+            return { evaluations, bestFinal };
         }
 
         function finishFastSuccess(session, reason) {
-            if (
-                !session ||
-                session.finished ||
-                session.cancelled ||
-                session.resultHandled
-            ) {
-                return false;
-            }
-
-            const applied =
-                finalizeRecognitionDecision(session, reason);
-
-            if (applied) {
-                requestStop(
-                    session,
-                    reason,
-                    false
-                );
-            }
-
+            if (!session || session.finished || session.cancelled || session.resultHandled) return false;
+            const applied = finalizeRecognitionDecision(session, reason);
+            if (applied) requestStop(session, reason, false);
             return applied;
         }
 
-        function scheduleFastDecision(
-            session,
-            delayMs,
-            reason,
-            mode = 'success'
-        ) {
-            if (
-                !session ||
-                session.finished ||
-                session.cancelled ||
-                session.resultHandled
-            ) {
-                return;
-            }
-
+        function scheduleFastDecision(session, delayMs, reason, mode = 'success') {
+            if (!session || session.finished || session.cancelled || session.resultHandled) return;
             clearTimeout(session.earlyDecisionTimer);
 
             session.earlyDecisionTimer = setTimeout(() => {
-                if (
-                    session.finished ||
-                    session.cancelled ||
-                    session.resultHandled
-                ) {
-                    return;
-                }
-
-                const { bestFinal } =
-                    getBestFinalEvaluation(session);
-
+                if (session.finished || session.cancelled || session.resultHandled) return;
+                const { bestFinal } = getBestFinalEvaluation(session);
                 if (!bestFinal) return;
 
                 if (mode === 'success') {
-                    if (
-                        bestFinal.score >= SCORE_CORRECT
-                    ) {
-                        finishFastSuccess(
-                            session,
-                            reason
-                        );
-                    }
+                    if (bestFinal.score >= SCORE_CORRECT) finishFastSuccess(session, reason);
                     return;
                 }
 
-                const targetLength =
-                    getTargetZhuyin(
-                        session.targetPokemon
-                    ).length;
+                const targetLength = getTargetZhuyin(session.targetPokemon).length;
+                const spokenLength = Array.isArray(bestFinal.spokenZhuyin) ? bestFinal.spokenZhuyin.length : 0;
 
-                const spokenLength =
-                    Array.isArray(bestFinal.spokenZhuyin)
-                        ? bestFinal.spokenZhuyin.length
-                        : 0;
-
-                if (
-                    bestFinal.finalSeen &&
-                    (
-                        spokenLength >= targetLength ||
-                        String(
-                            bestFinal.cleanText || ''
-                        ).length >= targetLength
-                    )
-                ) {
-                    requestStop(
-                        session,
-                        reason,
-                        true
-                    );
+                if (bestFinal.finalSeen && (spokenLength >= targetLength || String(bestFinal.cleanText || '').length >= targetLength)) {
+                    requestStop(session, reason, true);
                 }
             }, delayMs);
         }
 
         function considerFastDecision(session) {
-            if (
-                !session ||
-                session.finished ||
-                session.cancelled ||
-                session.resultHandled ||
-                session.stopRequested
-            ) {
-                return;
-            }
-
-            const { bestFinal } =
-                getBestFinalEvaluation(session);
-
+            if (!session || session.finished || session.cancelled || session.resultHandled || session.stopRequested) return;
+            const { bestFinal } = getBestFinalEvaluation(session);
             if (!bestFinal) return;
 
-            if (
-                bestFinal.exactTextMatch ||
-                bestFinal.exactZhuyinMatch
-            ) {
-                clearTimeout(
-                    session.earlyDecisionTimer
-                );
-
-                finishFastSuccess(
-                    session,
-                    bestFinal.exactTextMatch
-                        ? 'fast exact-text final'
-                        : 'fast exact-zhuyin final'
-                );
+            if (bestFinal.exactTextMatch || bestFinal.exactZhuyinMatch) {
+                clearTimeout(session.earlyDecisionTimer);
+                finishFastSuccess(session, bestFinal.exactTextMatch ? 'fast exact-text final' : 'fast exact-zhuyin final');
                 return;
             }
 
-            if (
-                bestFinal.score >= SCORE_CORRECT
-            ) {
-                scheduleFastDecision(
-                    session,
-                    FAST_FINAL_CONFIRM_MS,
-                    'fast high-score final',
-                    'success'
-                );
+            if (bestFinal.score >= SCORE_CORRECT) {
+                scheduleFastDecision(session, FAST_FINAL_CONFIRM_MS, 'fast high-score final', 'success');
                 return;
             }
 
-            const targetLength =
-                getTargetZhuyin(
-                    session.targetPokemon
-                ).length;
+            const targetLength = getTargetZhuyin(session.targetPokemon).length;
+            const spokenLength = Array.isArray(bestFinal.spokenZhuyin) ? bestFinal.spokenZhuyin.length : 0;
 
-            const spokenLength =
-                Array.isArray(bestFinal.spokenZhuyin)
-                    ? bestFinal.spokenZhuyin.length
-                    : 0;
-
-            if (
-                spokenLength >= targetLength ||
-                String(
-                    bestFinal.cleanText || ''
-                ).length >= targetLength
-            ) {
-                scheduleFastDecision(
-                    session,
-                    FINAL_BELOW_THRESHOLD_SETTLE_MS,
-                    'complete final settled below threshold',
-                    'stop-only'
-                );
+            if (spokenLength >= targetLength || String(bestFinal.cleanText || '').length >= targetLength) {
+                scheduleFastDecision(session, FINAL_BELOW_THRESHOLD_SETTLE_MS, 'complete final settled below threshold', 'stop-only');
             }
         }
 
         function finishSession(session, options = {}) {
             if (!session || session.finished) return;
-
             session.finished = true;
             clearSessionTimers(session);
 
@@ -2347,12 +1596,7 @@
                 setMicBusy(false);
             }
 
-            if (
-                !session.cancelled &&
-                !session.resultHandled &&
-                !session.userMessageHandled &&
-                !options.keepStatus
-            ) {
+            if (!session.cancelled && !session.resultHandled && !session.userMessageHandled && !options.keepStatus) {
                 setStatus('⏸️ 沒有收到可用的語音辨識結果，再試一次唷！', 'retry');
             }
 
@@ -2361,14 +1605,9 @@
 
         function forceAbortSession(session, reason = 'watchdog') {
             if (!session || session.finished || !session.recognition) return;
-
             if (!session.abortRequested) {
                 session.abortRequested = true;
-
-                try {
-                    session.recognition.abort();
-                } catch (error) {
-                }
+                try { session.recognition.abort(); } catch (error) {}
             }
 
             clearTimeout(session.abortSettleTimer);
@@ -2386,11 +1625,9 @@
             clearTimeout(session.hardLimitTimer);
             session.hardLimitTimer = setTimeout(() => {
                 if (session.finished) return;
-
                 if (!session.resultHandled && !session.cancelled) {
                     finalizeRecognitionDecision(session, 'hard session limit');
                 }
-
                 forceAbortSession(session, 'hard session limit');
             }, HARD_SESSION_LIMIT_MS);
         }
@@ -2399,25 +1636,15 @@
             clearTimeout(session.audioStopWatchdogTimer);
             session.audioStopWatchdogTimer = setTimeout(() => {
                 if (session.finished || session.audioEnded || session.serviceEnded) return;
-
                 if (!session.resultHandled && !session.cancelled) {
                     finalizeRecognitionDecision(session, 'audio stop watchdog');
                 }
-
                 forceAbortSession(session, 'audio stop watchdog');
             }, AUDIO_STOP_WATCHDOG_MS);
         }
 
         function requestStop(session, reason = 'timer', updateMessage = true) {
-            if (
-                !session ||
-                session.finished ||
-                session.serviceEnded ||
-                !session.recognition ||
-                session.stopRequested
-            ) {
-                return;
-            }
+            if (!session || session.finished || session.serviceEnded || !session.recognition || session.stopRequested) return;
 
             session.stopRequested = true;
             session.stopReason = reason;
@@ -2444,22 +1671,17 @@
         function cancelActiveRecognition(reason = 'cancel', silent = false) {
             const session = activeSession;
             if (!session || session.finished) return;
-
             session.cancelled = true;
             session.userMessageHandled = true;
             session.stopReason = reason;
             forceAbortSession(session, reason);
-
-            if (!silent) {
-                setStatus('⏸️ 錄音已取消。', 'retry');
-            }
+            if (!silent) setStatus('⏸️ 錄音已取消。', 'retry');
         }
 
         function scheduleResultWaitAfterAudioEnd(session) {
             clearTimeout(session.resultWaitTimer);
             session.resultWaitTimer = setTimeout(() => {
                 if (session.finished || session.resultHandled || session.cancelled) return;
-
                 finalizeRecognitionDecision(session, 'audioend result settle timeout');
                 forceAbortSession(session, 'result settle complete');
             }, RESULT_WAIT_AFTER_AUDIO_MS);
@@ -2474,50 +1696,26 @@
                 recognition,
                 createdAt: performance.now(),
                 targetPokemon: currentPokemon,
-                started: false,
-                audioStarted: false,
-                audioEnded: false,
-                speechStarted: false,
-                speechEnded: false,
-                serviceEnded: false,
-                stopRequested: false,
-                stopReason: '',
-                abortRequested: false,
-                resultHandled: false,
-                finalResultHandled: false,
-                userMessageHandled: false,
-                cancelled: false,
-                finished: false,
-                resultSource: '',
+                started: false, audioStarted: false, audioEnded: false,
+                speechStarted: false, speechEnded: false, serviceEnded: false,
+                stopRequested: false, stopReason: '', abortRequested: false,
+                resultHandled: false, finalResultHandled: false, userMessageHandled: false,
+                cancelled: false, finished: false, resultSource: '',
                 candidateMap: new Map(),
                 recordingLimitMs: getSpeechRecordingLimitMs(currentPokemon),
-                preSpeechTimer: null,
-                recordingTimer: null,
-                speechEndTimer: null,
-                audioStopWatchdogTimer: null,
-                resultWaitTimer: null,
-                endGraceTimer: null,
-                hardLimitTimer: null,
-                abortSettleTimer: null,
-                earlyDecisionTimer: null
+                preSpeechTimer: null, recordingTimer: null, speechEndTimer: null,
+                audioStopWatchdogTimer: null, resultWaitTimer: null, endGraceTimer: null,
+                hardLimitTimer: null, abortSettleTimer: null, earlyDecisionTimer: null
             };
 
             recognition.lang = 'zh-TW';
             recognition.interimResults = true;
             recognition.maxAlternatives = MAX_ALTERNATIVES;
-
-            /*
-             * V16 保留 continuous=true：
-             * continuous=true 讓慢速分段講話有機會繼續產生下一段結果。
-             * 若瀏覽器實作不完整，並改善慢速、分段發音時被提早切斷的情況。
-             */
             recognition.continuous = true;
 
             recognition.onstart = () => {
                 if (!isCurrentSession(session) || session.cancelled) return;
-
                 session.started = true;
-
                 setStatus('👂 麥克風已開啟，請正常把完整答案說完');
                 setMicBusy(true, '⏹️ 錄音中...');
 
@@ -2533,34 +1731,21 @@
                 startHardSessionWatchdog(session);
             };
 
-            recognition.onaudiostart = () => {
-                session.audioStarted = true;
-            };
-
-            recognition.onsoundstart = () => {
-                clearTimeout(session.speechEndTimer);
-            };
-
-            recognition.onsoundend = () => {
-            };
+            recognition.onaudiostart = () => { session.audioStarted = true; };
+            recognition.onsoundstart = () => { clearTimeout(session.speechEndTimer); };
+            recognition.onsoundend = () => {};
 
             recognition.onspeechstart = () => {
                 const firstSpeechStart = !session.speechStarted;
                 session.speechStarted = true;
                 session.speechEnded = false;
-
                 clearTimeout(session.preSpeechTimer);
                 clearTimeout(session.speechEndTimer);
 
-                /* 只在第一次真正說話時啟動整題最大說話時間。 */
                 if (firstSpeechStart) {
                     clearTimeout(session.recordingTimer);
                     session.recordingTimer = setTimeout(() => {
-                        requestStop(
-                            session,
-                            `speechstart 後 ${session.recordingLimitMs}ms 最大收音窗`,
-                            true
-                        );
+                        requestStop(session, `speechstart 後 ${session.recordingLimitMs}ms 最大收音窗`, true);
                     }, session.recordingLimitMs);
                 }
 
@@ -2571,15 +1756,10 @@
 
             recognition.onspeechend = () => {
                 session.speechEnded = true;
-
                 if (isCurrentSession(session) && !session.cancelled) {
                     setStatus(`⏳ 偵測到停頓，保留 ${SPEECH_END_GRACE_MS / 1000} 秒等待後續語音...`);
                 }
 
-                /*
-                 * V16：靜音窗縮短為 1.5 秒。
-                 * 若期間 Safari 又送 soundstart / speechstart，倒數仍會被取消。
-                 */
                 clearTimeout(session.speechEndTimer);
                 session.speechEndTimer = setTimeout(() => {
                     if (!session.finished && !session.cancelled && !session.stopRequested) {
@@ -2590,7 +1770,6 @@
 
             recognition.onaudioend = () => {
                 session.audioEnded = true;
-
                 clearTimeout(session.audioStopWatchdogTimer);
                 clearTimeout(session.preSpeechTimer);
                 clearTimeout(session.recordingTimer);
@@ -2603,18 +1782,9 @@
             };
 
             recognition.onresult = event => {
-                /*
-                 * 每次有新結果，先取消前一次的早停倒數。
-                 * 代表瀏覽器還在更新辨識內容，應以最新候選重新評估。
-                 */
                 clearTimeout(session.earlyDecisionTimer);
-
                 captureRecognitionResult(session, event);
-
-                if (!isCurrentSession(session) || session.cancelled) {
-                    return;
-                }
-
+                if (!isCurrentSession(session) || session.cancelled) return;
                 considerFastDecision(session);
 
                 if (!session.resultHandled && !session.stopRequested) {
@@ -2634,10 +1804,7 @@
                 if (!isCurrentSession(session) || session.cancelled) return;
                 if (errorName === 'aborted' && session.abortRequested) return;
 
-                if (
-                    errorName === 'not-allowed' ||
-                    errorName === 'service-not-allowed'
-                ) {
+                if (errorName === 'not-allowed' || errorName === 'service-not-allowed') {
                     session.userMessageHandled = true;
                     setStatus('🎤 請允許瀏覽器使用麥克風後再試一次。', 'error');
                 } else if (errorName === 'audio-capture') {
@@ -2659,7 +1826,6 @@
 
             recognition.onend = () => {
                 session.serviceEnded = true;
-
                 clearTimeout(session.audioStopWatchdogTimer);
                 clearTimeout(session.resultWaitTimer);
                 clearTimeout(session.preSpeechTimer);
@@ -2676,18 +1842,12 @@
                     return;
                 }
 
-                /*
-                 * Safari 偶爾 onend 與最後 result 的順序會很接近。
-                 * 再保留短暫 settle window，之後才做「整個 session」最終判斷。
-                 */
                 clearTimeout(session.endGraceTimer);
                 session.endGraceTimer = setTimeout(() => {
                     if (session.finished) return;
-
                     if (!session.resultHandled) {
                         finalizeRecognitionDecision(session, 'recognition onend settle');
                     }
-
                     finishSession(session, { keepStatus: true });
                 }, END_RESULT_GRACE_MS);
             };
@@ -2699,10 +1859,7 @@
             if (!SpeechRecognition || !currentPokemon) return;
 
             if (typeof pinyinFn !== 'function') {
-                setStatus(
-                    '❌ 注音判分模組目前不可用，已停止本次錄音，避免誤判。',
-                    'error'
-                );
+                setStatus('❌ 注音判分模組目前不可用，已停止本次錄音，避免誤判。', 'error');
                 micBtn.disabled = true;
                 micBtn.textContent = '⚠️ 判分模組未載入';
                 return;
@@ -2727,18 +1884,11 @@
             }
         }
 
-        /* =========================================================
-         * 按鈕
-         * ========================================================= */
-
         modeBtn.addEventListener('click', () => {
             if (isChangingQuestion) return;
-
             pendingMicStart = false;
             isReadingMode = !isReadingMode;
-            modeBtn.textContent = isReadingMode
-                ? '切換為：拼音模式'
-                : '切換為：認字模式';
+            modeBtn.textContent = isReadingMode ? '切換為：拼音模式' : '切換為：認字模式';
             loadRandomPokemon();
         });
 
@@ -2748,13 +1898,11 @@
                 setStatus('⏳ 正在換題，完成後會自動開啟麥克風...');
                 return;
             }
-
             startRecognition();
         });
 
         showBtn.addEventListener('click', () => {
             if (isChangingQuestion || !currentPokemon) return;
-
             pendingMicStart = false;
             cancelActiveRecognition('查看答案', true);
             revealAnswer();
@@ -2763,14 +1911,9 @@
 
         nextBtn.addEventListener('click', () => {
             if (isChangingQuestion) return;
-
             pendingMicStart = false;
             loadRandomPokemon();
         });
-
-        /* =========================================================
-         * iPad / iPhone Safari 背景切換保護
-         * ========================================================= */
 
         document.addEventListener('visibilitychange', () => {
             if (document.hidden && activeSession && !activeSession.finished) {
