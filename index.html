@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#f4f6fb">
     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="./icon-192.png">
-    <title>寶可夢拼音/認字挑戰 V17</title>
+    <title>寶可夢拼音/認字挑戰 V17.1</title>
     <style>
         * {
             box-sizing: border-box;
@@ -402,7 +402,7 @@
             pointer-events: none;
             z-index: 999;
         }
-        /* V17: use one viewport, additive safe-area padding and three layout rows. */
+        /* V17.1: use one viewport, additive safe-area padding and three layout rows. */
         html { height: 100%; overflow: auto; }
         body {
             height: 100%; height: 100dvh; min-height: 0;
@@ -501,9 +501,9 @@
     </main>
 
     <aside id="parentPanel" hidden aria-label="家長設定">
-        <strong>V17 家長診斷</strong>
+        <strong>V17.1 家長診斷</strong>
         <p>僅記錄本次開啟期間的事件與時間；不保存錄音、辨識文字或兒童作答歷史。</p>
-        <label>收音策略 <select id="voiceMode"><option value="auto">自動（建議）</option><option value="compat">相容／自然結束</option><option value="fast">快速／連續收音</option></select></label>
+        <label>收音策略 <select id="voiceMode"><option value="auto">自動（建議）</option><option value="primed">語音提示＋自然結束</option><option value="compat">相容／自然結束（無提示）</option><option value="fast">快速／連續收音</option></select></label>
         <button id="copyEvents" type="button">複製事件</button><button id="clearEvents" type="button">清除</button><button id="closeParent" type="button">關閉</button>
         <pre id="eventOutput"></pre>
     </aside>
@@ -569,7 +569,7 @@
         }
 
         /* =========================================================
-         * 寶可夢拼音 / 認字挑戰 V17 Universal Stable（保留 V16 判分核心）
+         * 寶可夢拼音 / 認字挑戰 V17.1 Universal Stable（保留 V16 判分核心）
          * ========================================================= */
 
         let currentPokemon = null;
@@ -586,6 +586,10 @@
         let strategyPreference = 'auto';
         let autoCompat = false;
         let consecutiveFaults = 0;
+        let voicePrompt = null;
+        let promptFailed = false;
+        const speechPromptSupported = Boolean(window.speechSynthesis && window.SpeechSynthesisUtterance);
+        const PROMPT_TIMEOUT_MS = 5000;
         const appleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
         const START_TIMEOUT_MS = 8000;
@@ -602,9 +606,13 @@
             if(!parentPanel.hidden) renderEvents();
         }
         function renderEvents() {
-            document.getElementById('eventOutput').textContent = `V17 | ${appleMobile?'Apple mobile':'Other'} | standalone=${standalone} | mode=${chooseStrategy()} | pinyin=${pinyinHealthy?'OK':'not ready'}\n${navigator.userAgent}\n`+events.join('\n');
+            document.getElementById('eventOutput').textContent = `V17.1 | ${appleMobile?'Apple mobile':'Other'} | standalone=${standalone} | mode=${chooseStrategy()} | pinyin=${pinyinHealthy?'OK':'not ready'}\n${navigator.userAgent}\n`+events.join('\n');
         }
-        function chooseStrategy() { return strategyPreference==='auto' ? (appleMobile||autoCompat?'compat':'fast') : strategyPreference; }
+        function chooseStrategy() {
+            if(strategyPreference!=='auto') return strategyPreference;
+            if(appleMobile) return speechPromptSupported&&!promptFailed?'primed':'compat';
+            return autoCompat?'compat':'fast';
+        }
 
         const SCORE_CORRECT = 90;
         const SCORE_CLOSE = 75;
@@ -1540,13 +1548,13 @@
             return { evaluations, bestFinal };
         }
 
-        // V17 lifecycle: one live recognition object, explicit release, new user gesture per attempt.
+        // V17.1 lifecycle: one live recognition object, explicit release, new user gesture per attempt.
         function refreshControls() {
-            const busy = Boolean(activeSession || isChangingQuestion || cardAnimating || !currentPokemon);
+            const busy = Boolean(activeSession || voicePrompt || isChangingQuestion || cardAnimating || !currentPokemon);
             const cooling = performance.now() < cooldownUntil;
             micBtn.disabled = busy || !initialized || cooling || !pinyinHealthy || !SpeechRecognition || document.hidden;
             nextBtn.disabled = busy; modeBtn.disabled = busy; showBtn.disabled = busy;
-            if (!activeSession) {
+            if (!activeSession && !voicePrompt) {
                 micBtn.style.backgroundColor = '#4CAF50'; micBtn.setAttribute('aria-pressed','false');
                 micBtn.textContent = !initialized ? '初始化中…' : !SpeechRecognition ? '不支援語音辨識' : !pinyinHealthy ? '注音模組未就緒' : cooling ? '麥克風準備中…' : '🎤 按下說話';
             }
@@ -1582,7 +1590,7 @@
             trace(session,'FAULT',reason+' failures='+consecutiveFaults);
             if(!session.resultHandled && !session.cancelled) {
                 session.userMessageHandled=true;
-                setStatus(consecutiveFaults>=2 ? '語音服務未回應，請重新開啟 App，或改用 Safari 網頁。' : '語音服務沒有回應，請再按一次麥克風。','error');
+                setStatus(consecutiveFaults>=2 ? '語音服務未回應，請完全關閉 App 再開啟。' : '語音服務沒有回應，請再按一次麥克風。','error');
             }
         }
         function forceAbort(session, reason) {
@@ -1642,7 +1650,7 @@
                 }); return;
             }
             // Preserve the natural end path for single-utterance recognition.
-            if(session.strategy==='compat') return;
+            if(session.strategy!=='fast') return;
             const length=getTargetZhuyin(session.targetPokemon).length;
             if(bestFinal.spokenZhuyin.length>=length || String(bestFinal.cleanText||'').length>=length)
                 timer(session,'earlyDecisionTimer',FINAL_BELOW_THRESHOLD_SETTLE_MS,()=>requestStop(session,'complete final settle'));
@@ -1653,10 +1661,10 @@
             session.cancelled=true; clearTimers(session); trace(session,'CANCEL',reason);
             if(session.serviceEnded) finishSession(session,true); else forceAbort(session,reason);
         }
-        function createRecognitionSession() {
+        function createRecognitionSession(strategy) {
             const recognition=new SpeechRecognition();
             const session={id:++sessionSerial,recognition,createdAt:performance.now(),targetPokemon:currentPokemon,
-                strategy:chooseStrategy(),candidateMap:new Map(),recordingLimitMs:getSpeechRecordingLimitMs(currentPokemon),
+                strategy,candidateMap:new Map(),recordingLimitMs:getSpeechRecordingLimitMs(currentPokemon),
                 started:false,audioStarted:false,audioEnded:false,speechStarted:false,serviceEnded:false,
                 stopRequested:false,abortRequested:false,resultHandled:false,userMessageHandled:false,cancelled:false,finished:false,
                 resultEvents:0,faultMarked:false};
@@ -1702,7 +1710,7 @@
             recognition.onspeechend=()=>{
                 if(!live(session))return;
                 trace(session,'SPEECH_END');
-                if(session.resultHandled||session.stopRequested||session.strategy==='compat') return;
+                if(session.resultHandled||session.stopRequested||session.strategy!=='fast') return;
                 timer(session,'speechEndTimer',SPEECH_END_GRACE_MS,()=>requestStop(session,'speech end grace'));
             };
             recognition.onaudioend=()=>{
@@ -1763,10 +1771,10 @@
             };
             return session;
         }
-        function startRecognition() {
+        function startRecognitionSession(strategy) {
             if(!initialized||!pinyinHealthy||!SpeechRecognition||!currentPokemon||activeSession||cardAnimating||isChangingQuestion||document.hidden||performance.now()<cooldownUntil) return;
             let session;
-            try {session=createRecognitionSession();} catch(e) {setStatus('語音服務無法啟動，請重新開啟。','error');trace(null,'CREATE_ERROR',e.name||'error');return;}
+            try {session=createRecognitionSession(strategy);} catch(e) {setStatus('語音服務無法啟動，請重新開啟。','error');trace(null,'CREATE_ERROR',e.name||'error');return;}
             activeSession=session;refreshControls();setStatus('麥克風準備中，等提示再說話');setMicBusy(true,'⏳ 準備中…');
             trace(session,'CREATE',`mode=${session.strategy} max=${session.recordingLimitMs}`);
             timer(session,'startTimer',START_TIMEOUT_MS,()=>{markFault(session,'start timeout');forceAbort(session,'start timeout');});
@@ -1776,22 +1784,74 @@
                 }
                 forceAbort(session,'hard limit');
             });
-            // start() stays synchronous within the real tap. Never auto-start from a timer.
+            // Direct user tap, or immediately after the TTS utterance has ended.
             try {session.recognition.start();} catch(e) {markFault(session,'start threw '+(e.name||'error'));finishSession(session,false);}
         }
+        // iOS compatibility experiment: complete a short spoken cue, then create a fresh recognizer.
+        // Never listen while the cue is playing. No automatic retry or overlapping audio sessions.
+        function cancelVoicePrompt(reason) {
+            const prompt=voicePrompt;
+            if(!prompt) return;
+            voicePrompt=null; clearTimeout(prompt.timeout);
+            prompt.utterance.onstart=prompt.utterance.onend=prompt.utterance.onerror=null;
+            trace(null,'PROMPT_CANCEL',reason);
+            try { window.speechSynthesis.cancel(); } catch(e) {}
+            refreshControls();
+        }
+        function startRecognition() {
+            if(!initialized||!pinyinHealthy||!SpeechRecognition||!currentPokemon||activeSession||voicePrompt||cardAnimating||isChangingQuestion||document.hidden||performance.now()<cooldownUntil) return;
+            const strategy=chooseStrategy();
+            if(strategy!=='primed') {startRecognitionSession(strategy);return;}
+            if(!speechPromptSupported) {
+                promptFailed=true;trace(null,'PROMPT_UNAVAILABLE');
+                if(strategyPreference==='auto') startRecognitionSession('compat');
+                else setStatus('裝置不支援語音提示，請在家長設定選擇無提示相容模式。','error');
+                return;
+            }
+            const target=currentPokemon;
+            let utterance;
+            try { utterance=new window.SpeechSynthesisUtterance('請說'); }
+            catch(e) {promptFailed=true;trace(null,'PROMPT_ERROR','create');setStatus('語音提示無法啟動，請再按一次或切換家長設定。','error');return;}
+            utterance.lang='zh-TW';utterance.rate=1;utterance.volume=1;
+            const prompt={utterance,target,timeout:null};voicePrompt=prompt;
+            function fail(reason) {
+                if(voicePrompt!==prompt)return;
+                promptFailed=true;trace(null,'PROMPT_ERROR',reason);
+                cancelVoicePrompt(reason);
+                setStatus(strategyPreference==='auto'?'語音提示未完成，請再按一次（改用無提示模式）。':'語音提示未完成，請重試或切換家長設定。','error');
+            }
+            utterance.onstart=()=>{if(voicePrompt===prompt)trace(null,'PROMPT_START');};
+            utterance.onerror=e=>fail(e.error||'unknown');
+            utterance.onend=()=>{
+                if(voicePrompt!==prompt)return;
+                clearTimeout(prompt.timeout);voicePrompt=null;
+                utterance.onstart=utterance.onend=utterance.onerror=null;
+                trace(null,'PROMPT_END');
+                if(document.hidden||target!==currentPokemon){refreshControls();return;}
+                startRecognitionSession('primed');
+                if(!activeSession)refreshControls();
+            };
+            refreshControls();setMicBusy(true,'🔊 請等語音提示…');setStatus('聽到提示後，等麥克風就緒再說話');
+            trace(null,'PROMPT_REQUEST');
+            prompt.timeout=setTimeout(()=>fail('timeout'),PROMPT_TIMEOUT_MS);
+            try {
+                if(window.speechSynthesis.pending||window.speechSynthesis.speaking)window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(utterance);
+            } catch(e) {fail(e.name||'speak threw');}
+        }
         modeBtn.addEventListener('click',()=>{
-            if(activeSession||isChangingQuestion||cardAnimating||!currentPokemon) return;
+            if(activeSession||voicePrompt||isChangingQuestion||cardAnimating||!currentPokemon) return;
             isReadingMode=!isReadingMode;modeBtn.textContent=isReadingMode?'切換為：拼音模式':'切換為：認字模式';loadRandomPokemon();
         });
         micBtn.addEventListener('click',startRecognition);
-        showBtn.addEventListener('click',()=>{if(activeSession||isChangingQuestion||cardAnimating||!currentPokemon)return;revealAnswer();setStatus(`答案是：${currentPokemon.name}`);});
-        nextBtn.addEventListener('click',()=>{if(!activeSession&&!isChangingQuestion&&!cardAnimating&&currentPokemon)loadRandomPokemon();});
+        showBtn.addEventListener('click',()=>{if(activeSession||voicePrompt||isChangingQuestion||cardAnimating||!currentPokemon)return;revealAnswer();setStatus(`答案是：${currentPokemon.name}`);});
+        nextBtn.addEventListener('click',()=>{if(!activeSession&&!voicePrompt&&!isChangingQuestion&&!cardAnimating&&currentPokemon)loadRandomPokemon();});
         document.addEventListener('visibilitychange',()=>{
-            if(document.hidden){stopConfetti();cancelActiveRecognition('background');}
+            if(document.hidden){stopConfetti();cancelVoicePrompt('background');cancelActiveRecognition('background');}
             else {trace(null,'FOREGROUND'); if(!activeSession){beginCooldown(appleMobile?450:100);if(currentPokemon&&!card.classList.contains('flipped')) showQuestionPrompt();}}
         });
-        window.addEventListener('pagehide',()=>{stopConfetti();cancelActiveRecognition('pagehide');});
-        window.addEventListener('pageshow',e=>{if(e.persisted){cancelActiveRecognition('pageshow restore');refreshControls();}});
+        window.addEventListener('pagehide',()=>{stopConfetti();cancelVoicePrompt('pagehide');cancelActiveRecognition('pagehide');});
+        window.addEventListener('pageshow',e=>{if(e.persisted){cancelVoicePrompt('pageshow restore');cancelActiveRecognition('pageshow restore');refreshControls();}});
         // Parent-only panel: bounded in-memory event summaries; no speech text or persistent history.
         let holdTimer;const trigger=document.getElementById('parentTrigger');
         function openParent(){parentPanel.hidden=false;renderEvents();}
@@ -1801,7 +1861,7 @@
         trigger.addEventListener('contextmenu',e=>e.preventDefault());
         document.getElementById('closeParent').onclick=()=>{parentPanel.hidden=true;};
         document.getElementById('clearEvents').onclick=()=>{events.length=0;renderEvents();};
-        document.getElementById('voiceMode').onchange=e=>{strategyPreference=e.target.value;autoCompat=false;consecutiveFaults=0;trace(null,'STRATEGY',strategyPreference);renderEvents();};
+        document.getElementById('voiceMode').onchange=e=>{strategyPreference=e.target.value;autoCompat=false;promptFailed=false;consecutiveFaults=0;trace(null,'STRATEGY',strategyPreference);renderEvents();};
         document.getElementById('copyEvents').onclick=async()=>{
             const output=document.getElementById('eventOutput');
             try{await navigator.clipboard.writeText(output.textContent);document.getElementById('copyEvents').textContent='已複製';}
